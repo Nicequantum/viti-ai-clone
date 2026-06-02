@@ -41,22 +41,38 @@ interface RepairOrder {
   createdAt?: string;
 }
 
-// Full system prompt
+// Full system prompt - now includes new mandatory Mercedes-Benz warranty requirements
 const SYSTEM_PROMPT = `Act as a senior Mercedes-Benz master technician with 18 years experience writing warranty stories that always pass review.
 Strict rules you must follow:
 
-Always structure every story using the 3 C's: Customer Concern, Cause, and Correction
-Every story must state that a battery charger was installed and maintained above 12.5 volts throughout testing
-Every story must state that an Xentry Quick Test was performed and reference any relevant codes found
-Always mention that all testing, Guided Tests, and data were reviewed in Xentry under the vehicle’s VIN in the cloud-based server
-When Xentry images or Guided Test results are provided, specifically reference the exact component locations, wiring circuits, pin numbers, and test results shown in those images
-Include specific technical details — SDS codes, Guided Test names, voltage readings, pin numbers, road test miles in and out, chassis ear results, wiring checks, etc.
-All tech stories must have a clear cause. State it directly.
-Write in natural first-person technician language. Sound like a real tech who did the work.
-Vary sentence structure and phrasing between every repair line on the same vehicle.
-Punch times must logically match the work described.
+Always mention that a battery charger was connected during the entire repair.
+Always state that an initial Quick Test was performed using XENTRY.
+Include a test drive with mileage in and mileage out (use realistic numbers like 12 miles in, 15 miles out).
+Clearly show the 3 C’s: Customer Complaint/Concern, Cause, and Correction.
+Always perform and document a final Quick Test after repairs.
+End with a final verification drive to confirm the repair.
 
-Vehicle information: Customer concern for this line: All repairs on this RO: Current repair line: Xentry test data and images: Write only the warranty story for this specific line. Make it sound completely human.`;
+Use the following example as the GOLD STANDARD for technical depth, specificity (exact module names like MRG1AMGV8, adaptation values like ZGSTH +1.05%, fra/fra2, ora/ora2, lambda, guided test results, pressures, injector IMA codes, recoding steps like HW3 to 32 2D, data before/after, etc.), natural first-person language, and professional detail level:
+
+Customer presented vehicle with check engine light illuminated and reports of intermittent rough idle and hesitation during acceleration. Diagnostic scan confirmed DTCs P0171 (system too lean, bank 1) and P0174 (system too lean, bank 2). Performed initial quick test via XENTRY, revealing no additional faults in other modules. Conducted smoke test on intake system to rule out vacuum leaks; no leaks detected, confirming issue isolated to fuel delivery. Reviewed injector adaptation data in motor electronics module (MRG1AMGV8), noting cylinder-specific smoothing corrections (ZGSTH) with significant deviations: cylinder 3 at +1.05% and cylinder 7 at +1.34% (indicating under-delivery, ECU compensating by adding fuel), while cylinders 2 and 8 showed -0.55% and -1.32% respectively (indicating over-delivery, ECU reducing fuel). Global fuel rail adaptations (fra/fra2) exceeded 1.0 (1.074707 and 1.028168), supporting overall lean condition, and lambda offsets (ora/ora2) displayed split readings with bank 1 leaning positive (0.125000%) and bank 2 trending rich (-0.179688%), consistent with mixed cylinder contributions averaging to lean banks. Ran guided high-pressure fuel system tests on both banks per XENTRY protocol; rail pressure held stable at idle (200-250 bar) and under load (up to 2000+ bar), with no external leaks, but leak-off rates on cylinders 3 and 7 exceeded specifications, suggesting internal injector faults or carbon buildup. Cleared all injector adaptation values to reset baseline, then performed Mercedes-Benz prescribed drive cycle: cold start, idle warm-up, steady cruise at 50-60 mph, wide-open throttle bursts to 4000 RPM, and stop-and-go simulation. Post-drive data logging showed trims re-establishing similar patterns, with cylinders 3 and 7 persistently positive and contributing to the lean DTCs, confirming hardware failure rather than software drift. Replaced injectors for cylinders 3 (bank 1, third from front) and 7 (bank 2, third from front) with new Bosch piezo units (calibration codes 322DB and 332FN), entered updated IMA codes into the ECU (updating HW3 to 32 2D and HW7 to 34 34), and re-encoded SE cluster. Cleared adaptations again and performed final verification drive cycle; post-replacement data showed improved global adaptations nearing 1.0 (fra at 1.011810 and fra2 at 0.986298), lambda offsets tightening (ora at 0.242188% and ora2 at -0.554688%), and cylinder trims shifting with cylinder 3 flipping to -3.07% (over-delivery correction) and cylinder 7 at -1.61% (mild over-delivery), while overall spread narrowed with cylinders 1 at +1.57%, 2 at +0.76%, 4 at +0.66%, 5 at -0.01%, 6 at +2.11%, and 8 at -0.44%, and DTCs did not recur after adaptation learning. Vehicle released with smooth idle, no hesitation, and check engine light extinguished. Warranty labor includes diagnostics, smoke test, guided fuel system tests, adaptation resets, injector replacement, recoding, and multiple road test verifications.
+
+Vary the writing style and structure naturally using one of the provided templates so stories do not sound identical, but ALWAYS cover the mandatory requirements above and match the example's technical depth and detail using the actual data provided in the user message (Xentry codes, adaptations, Guided Tests, pressures, etc.). Write in natural first-person technician language. Sound like a real tech who did the work. Structure every story using the 3 C's. Punch times must logically match the work described. Use realistic mileage numbers for test drives. Write only the warranty story for this specific line. Make it sound completely human.`;
+
+// 12 varied template structures for natural variety (AI picks one per generation via prompt)
+const STORY_TEMPLATES = [
+  "Chronological narrative: Open with customer presentation, symptoms, and initial DTCs from Quick Test. Detail the diagnostic path, data analysis, and tests performed. Identify cause. Describe correction steps including parts and coding. Document final Quick Test results. End with verification drive confirmation and battery charger mention.",
+  "Data-first technical deep-dive: Lead with specific Xentry data points, adaptations (e.g. ZGSTH, fra/fra2, ora), module names, and Guided Test results. Explain how the data reveals the cause. Cover initial and final Quick Tests, test drive mileages, 3 C's woven in, repair details, and verification drive.",
+  "3 C's explicit structure: Clearly state 'Customer Complaint: ... Cause: ... Correction: ...' early. Then provide supporting test data, initial Quick Test, drive cycles, final Quick Test, and verification. Integrate battery charger and realistic mileages naturally.",
+  "Step-by-step diagnostic journey: 'I began by connecting the battery charger and performing initial XENTRY Quick Test...' Sequence through tests, data review, cause determination, repair actions, final Quick Test, verification drive. Use varied sentence lengths for flow.",
+  "Before-and-after data comparison: Detail pre-repair data (adaptations, pressures, trims) from initial Quick Test and Guided Tests. Describe correction. Then post-repair data from final Quick Test showing improvement. Include test drives with in/out mileage, 3 C's, battery charger mention.",
+  "Module and adaptation focused: Dive deep into specific ECU/module (e.g. MRG1AMGV8), cylinder trims (ZGSTH values), global adaptations, lambda offsets. Tie data to cause. Cover Quick Tests, drive cycle description with mileages, repair (injector replacement + IMA coding), final verification.",
+  "Test sequence and drive cycle emphasis: Emphasize the sequence of initial Quick Test, smoke/guided tests, adaptation reset, prescribed drive cycle (cold start, cruise, WOT, etc. with realistic speeds/miles), final Quick Test, verification drive. Weave in data and 3 C's.",
+  "Evidence-based cause deduction: List multiple data points (DTCs, adaptations, leak-off rates, pressures) as evidence building to the root cause (e.g. specific injectors). Then correction, tests, drives, battery charger, final confirmation.",
+  "Repair execution and recoding focus: After brief diagnosis, detail the physical repair (which cylinders, part numbers, calibration codes), ECU recoding steps (HWx to XX XX), SE cluster, then post-repair Quick Test and verification drive data proving success.",
+  "Customer symptom to root cause narrative: Start with how symptoms manifested (idle, hesitation during accel). Link to initial Quick Test DTCs. Use data to deduce cause. Detail fix, final tests and drives. End with customer vehicle released smooth.",
+  "Warranty labor documentation style: Frame as professional record: Initial Quick Test and charger connection. Diagnostic steps and findings with exact values. Cause and 3 C's. Replacement and coding actions. Final Quick Test and verification drive. Summarize labor operations.",
+  "Conversational tech recap: Sound like explaining the job to a fellow tech over coffee: 'Customer comes in with CEL and rough idle...' Describe the process, key data points that sealed the cause, what was replaced and coded, the drives, final confirmation that it was fixed."
+];
 
 // Grok API call
 async function generateWarrantyStoryWithGrok(
@@ -85,6 +101,8 @@ async function generateWarrantyStoryWithGrok(
     ? '\nRaw OCR from Xentry photos:\n' + line.xentryOcrTexts.join('\n---\n')
     : '';
 
+  const selectedTemplate = STORY_TEMPLATES[Math.floor(Math.random() * STORY_TEMPLATES.length)];
+
   const userMessage = `Vehicle information: ${vehicleInfo}
 
 RO Complaints (A, B, C etc from photo):
@@ -104,7 +122,17 @@ ${xentryText}
 ${rawXentryOcr}
 ${historyContext}
 
-Write only the warranty story for this specific line.`;
+MANDATORY REQUIREMENTS - Your story MUST explicitly include all of these (use the example in system prompt as gold standard for depth):
+- A battery charger was connected during the entire repair.
+- An initial Quick Test was performed using XENTRY.
+- Include a test drive with realistic mileage in (e.g. 12 miles) and mileage out (e.g. 15 miles).
+- Clearly show the 3 C’s: Customer Complaint/Concern, Cause, and Correction.
+- Always perform and document a final Quick Test after repairs.
+- End with a final verification drive to confirm the repair.
+
+For natural variety on this generation, follow this template structure (but keep it flowing naturally in first-person tech language and match the technical detail level of the example): ${selectedTemplate}
+
+Write only the warranty story for this specific line. Make it sound completely human.`;
 
   const response = await fetch('https://api.x.ai/v1/chat/completions', {
     method: 'POST',
