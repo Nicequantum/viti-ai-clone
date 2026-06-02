@@ -3,11 +3,14 @@
 Clean, professional Mercedes-Benz technician tool for generating warranty stories using Grok AI.
 
 ## Features
-- Scan repair orders (camera + OCR with Tesseract.js)
-- Manage repair lines
-- Dedicated Settings screen for Grok API key
-- Real Grok API calls using the official senior master technician system prompt
+- Scan repair orders (camera + OCR with Tesseract.js) - auto extracts vehicle info AND all A/B/C/D complaint lines
+- Home screen with searchable history list of all past ROs (reopen anytime, nothing lost)
+- Manage repair lines with full persistence (IndexedDB)
+- On line detail page: "ADD XENTRY / DIAGNOSTIC PHOTOS" button for multiple Xentry/Quick Test/Guided Test images
+- Robust multi-image analysis: OCR + parse codes, Guided Tests, measurements, components, circuits/pins from Xentry screens; raw OCR sent to AI
+- Real Grok API calls using the official senior master technician system prompt, enhanced with RO complaints, Xentry raw data, and examples from your saved history for "learning"
 - Clean dark professional UI (PWA-ready)
+- Dedicated Settings screen for Grok API key (gear icon top-right on main screen)
 
 ## Setup
 
