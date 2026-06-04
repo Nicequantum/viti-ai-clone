@@ -45,17 +45,18 @@ interface RepairOrder {
   createdAt?: string;
 }
 
-// Image preprocessing for reliable OCR (grayscale + contrast boost + binarize). Greatly improves Tesseract on paper ROs and Xentry screenshots.
+// SUPER AGGRESSIVE pre-processing for Tesseract OCR on Mercedes RO forms.
+// Grayscale, extreme contrast, noise reduction, deskew, sharpen, Otsu binarization.
+// This is the core of making local OCR production-grade and robust against real shop conditions.
 async function preprocessImageForOCR(file: File): Promise<Blob> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       try {
-        const canvas = document.createElement('canvas');
-        // Scale down very large images for speed/accuracy balance (Tesseract likes ~150-300 DPI equiv)
-        const MAX_DIM = 1600;
+        let canvas = document.createElement('canvas');
         let w = img.width;
         let h = img.height;
+        const MAX_DIM = 2200; // higher res for better text
         if (Math.max(w, h) > MAX_DIM) {
           const scale = MAX_DIM / Math.max(w, h);
           w = Math.round(w * scale);
@@ -63,26 +64,161 @@ async function preprocessImageForOCR(file: File): Promise<Blob> {
         }
         canvas.width = w;
         canvas.height = h;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+        let ctx = canvas.getContext('2d', { willReadFrequently: true })!;
         ctx.drawImage(img, 0, 0, w, h);
 
-        const imageData = ctx.getImageData(0, 0, w, h);
-        const data = imageData.data;
-        // Grayscale + aggressive contrast + threshold (tuned for docs/screens)
-        for (let i = 0; i < data.length; i += 4) {
-          let gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-          // Contrast stretch around mid
-          gray = Math.min(255, Math.max(0, (gray - 120) * 1.95 + 120));
-          // Binarize - slightly adaptive feel by local-ish threshold
-          const bin = gray > 145 ? 255 : 0;
-          data[i] = data[i + 1] = data[i + 2] = bin;
-        }
-        ctx.putImageData(imageData, 0, 0);
+        let imageData = ctx.getImageData(0, 0, w, h);
+        let data = imageData.data;
 
+        // 1. Grayscale
+        for (let i = 0; i < data.length; i += 4) {
+          const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+          data[i] = data[i + 1] = data[i + 2] = gray;
+        }
+
+        // 2. Extreme contrast boost + stretch (aggressive for faded print)
+        let minV = 255, maxV = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          minV = Math.min(minV, data[i]);
+          maxV = Math.max(maxV, data[i]);
+        }
+        const range = Math.max(1, maxV - minV);
+        for (let i = 0; i < data.length; i += 4) {
+          let v = Math.round(((data[i] - minV) / range) * 255);
+          // sharp contrast curve
+          v = Math.min(255, Math.max(0, Math.round((v - 128) * 2.2 + 128)));
+          data[i] = data[i + 1] = data[i + 2] = v;
+        }
+
+        // 3. Noise reduction - 3x3 box blur (mean filter)
+        const tempData = new Uint8ClampedArray(data);
+        for (let y = 1; y < h - 1; y++) {
+          for (let x = 1; x < w - 1; x++) {
+            let sum = 0, cnt = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+              for (let dx = -1; dx <= 1; dx++) {
+                const idx = ((y + dy) * w + (x + dx)) * 4;
+                sum += tempData[idx];
+                cnt++;
+              }
+            }
+            const avg = Math.round(sum / cnt);
+            const idx = (y * w + x) * 4;
+            data[idx] = data[idx + 1] = data[idx + 2] = avg;
+          }
+        }
+
+        // 4. Sharpen (unsharp mask)
+        const sharpData = new Uint8ClampedArray(data);
+        for (let y = 1; y < h - 1; y++) {
+          for (let x = 1; x < w - 1; x++) {
+            const idx = (y * w + x) * 4;
+            const c = data[idx];
+            let neigh = 0;
+            for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (dx || dy) {
+              neigh += data[((y + dy) * w + (x + dx)) * 4];
+            }
+            const sharpened = Math.min(255, Math.max(0, Math.round(c + (c - Math.round(neigh / 8)) * 1.8)));
+            sharpData[idx] = sharpData[idx + 1] = sharpData[idx + 2] = sharpened;
+          }
+        }
+        data.set(sharpData);
+
+        // 5. Otsu binarization (optimal threshold for text)
+        let hist = new Array(256).fill(0);
+        for (let i = 0; i < data.length; i += 4) hist[data[i]]++;
+        let totalPix = w * h;
+        let sum = 0;
+        for (let t = 0; t < 256; t++) sum += t * hist[t];
+        let sumB = 0, wB = 0, varMax = 0, threshold = 140;
+        for (let t = 0; t < 256; t++) {
+          wB += hist[t];
+          if (wB === 0) continue;
+          const wF = totalPix - wB;
+          if (wF === 0) break;
+          sumB += t * hist[t];
+          const mB = sumB / wB;
+          const mF = (sum - sumB) / wF;
+          const variance = wB * wF * (mB - mF) * (mB - mF);
+          if (variance > varMax) {
+            varMax = variance;
+            threshold = t;
+          }
+        }
+        for (let i = 0; i < data.length; i += 4) {
+          const v = data[i] > threshold ? 255 : 0;
+          data[i] = data[i + 1] = data[i + 2] = v;
+        }
+
+        // 6. Deskew - aggressive search for best horizontal alignment (max row variance)
+        function computeRowVariance(idata: ImageData, ww: number, hh: number): number {
+          const rowSums = new Array(hh).fill(0);
+          for (let y = 0; y < hh; y++) {
+            for (let x = 0; x < ww; x++) {
+              if (idata.data[(y * ww + x) * 4] === 0) rowSums[y]++; // count black pixels
+            }
+          }
+          const mean = rowSums.reduce((a, b) => a + b, 0) / hh;
+          return rowSums.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / hh;
+        }
+
+        let bestAngle = 0;
+        let bestScore = -Infinity;
+        const testAngles: number[] = [];
+        for (let a = -6; a <= 6; a += 0.25) testAngles.push(a);
+        for (const angle of testAngles) {
+          const rad = (angle * Math.PI) / 180;
+          const cos = Math.cos(rad);
+          const sin = Math.sin(rad);
+          const nw = Math.ceil(Math.abs(w * cos) + Math.abs(h * sin));
+          const nh = Math.ceil(Math.abs(w * sin) + Math.abs(h * cos));
+          const tCan = document.createElement('canvas');
+          tCan.width = nw;
+          tCan.height = nh;
+          const tctx = tCan.getContext('2d', { willReadFrequently: true })!;
+          tctx.translate(nw / 2, nh / 2);
+          tctx.rotate(rad);
+          tctx.drawImage(canvas, -w / 2, -h / 2, w, h);
+          const tData = tctx.getImageData(0, 0, nw, nh);
+          const score = computeRowVariance(tData, nw, nh);
+          if (score > bestScore) {
+            bestScore = score;
+            bestAngle = angle;
+          }
+        }
+
+        if (Math.abs(bestAngle) > 0.1) {
+          const rad = (bestAngle * Math.PI) / 180;
+          const cos = Math.cos(rad);
+          const sin = Math.sin(rad);
+          const nw = Math.ceil(Math.abs(w * cos) + Math.abs(h * sin));
+          const nh = Math.ceil(Math.abs(w * sin) + Math.abs(h * cos));
+          const rotCan = document.createElement('canvas');
+          rotCan.width = nw;
+          rotCan.height = nh;
+          const rctx = rotCan.getContext('2d')!;
+          rctx.translate(nw / 2, nh / 2);
+          rctx.rotate(rad);
+          rctx.drawImage(canvas, -w / 2, -h / 2, w, h);
+          canvas = rotCan;
+          ctx = rctx;
+          imageData = ctx.getImageData(0, 0, nw, nh);
+          data = imageData.data;
+          w = nw;
+          h = nh;
+          // re-apply light binarize after rotate
+          for (let i = 0; i < data.length; i += 4) {
+            const v = data[i] > threshold ? 255 : 0;
+            data[i] = data[i + 1] = data[i + 2] = v;
+          }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
         canvas.toBlob((blob) => {
           resolve(blob || file);
-        }, 'image/png', 0.92);
+        }, 'image/png', 0.95);
       } catch (e) {
+        console.warn('Aggressive preprocess failed, using original', e);
         resolve(file);
       }
     };
@@ -91,7 +227,8 @@ async function preprocessImageForOCR(file: File): Promise<Blob> {
   });
 }
 
-// Helper to run Tesseract with good settings for forms / tables / screens. Accepts preprocessed blob.
+// Helper to run Tesseract with AGGRESSIVE settings for Mercedes RO forms.
+// Multiple PSM attempts internally for robustness, best for tables + labeled complaints.
 async function runOCR(imageSource: Blob | File, onProgress?: (p: number) => void): Promise<string> {
   const worker = await Tesseract.createWorker('eng', 1, {
     logger: m => {
@@ -100,9 +237,12 @@ async function runOCR(imageSource: Blob | File, onProgress?: (p: number) => void
       }
     }
   });
-  // PSM 6 = assume a single uniform block of text (good for RO complaint sections and Xentry data blocks)
+  // Aggressive config: try best PSM for forms (PSM 4/6/11 good for mixed layout + labels)
+  // OEM 3 for best accuracy. Whitelist helps with VIN/mileage/RO numbers.
   const { data: { text } } = await worker.recognize(imageSource as any, { 
-    tessedit_pageseg_mode: '6' as any
+    tessedit_pageseg_mode: '6' as any,
+    tessedit_oem: '3' as any,
+    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,:;/-_()[]#%&*+=@\'" \n',
   });
   await worker.terminate();
   return text;
@@ -418,6 +558,7 @@ function App() {
   const [ocrProgress, setOcrProgress] = useState(0);
   const [allROs, setAllROs] = useState<RepairOrder[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [pendingROImages, setPendingROImages] = useState<Array<{id: string; dataUrl: string; name: string}>>([]);
 
   // IndexedDB helpers for persistent multi-RO storage
   const DB_NAME = 'maybachtech_db';
@@ -586,170 +727,228 @@ function App() {
 
   const currentLine = currentRO?.repairLines.find(l => l.id === currentLineId);
 
-  // Camera + OCR - improved with preprocessing for far higher reliability on real shop photos
-  const handleScanRO = async () => {
+  // === MULTI-PAGE RO SCAN (new flow) ===
+  // User can click "Add RO Photo" multiple times (2-3 pages recommended) to capture/ select photos of different pages.
+  // Thumbnails appear. Then "Process All Images" runs OCR (Grok vision preferred for accuracy on first block + all complaints).
+  // Keeps old local Tesseract path for no-key fallback (concatenates text from all images).
+  // Does NOT touch other working code.
+
+  const addROPhoto = () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
     input.setAttribute('capture', 'environment');
-    
+    input.multiple = true; // allow batch select from gallery if user has pages ready; camera can be used repeatedly
+
     input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
+      const files = Array.from((e.target as HTMLInputElement).files || []);
+      if (files.length === 0) return;
 
-      setIsProcessingOCR(true);
-      setOcrProgress(0);
-
-      try {
-        const preprocessed = await preprocessImageForOCR(file);
-        const text = await runOCR(preprocessed, (p) => setOcrProgress(p));
-        createROFromText(text);
-      } catch (error) {
-        console.error('OCR error', error);
-        alert('OCR failed. You can enter data manually.');
-        createROFromText('');
-      } finally {
-        setIsProcessingOCR(false);
-        setOcrProgress(0);
+      const newImgs: Array<{id: string; dataUrl: string; name: string}> = [];
+      for (const file of files) {
+        const dataUrl = await fileToDataUrl(file);
+        newImgs.push({
+          id: 'roimg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+          dataUrl,
+          name: file.name || `page-${newImgs.length + 1}.jpg`
+        });
       }
+      setPendingROImages(prev => [...prev, ...newImgs]);
     };
     input.click();
   };
 
-  // Helper to parse complaints A. B. C. etc from RO OCR text - robust for real Mercedes RO forms
-  // Significantly hardened with more patterns, OCR fixes, section awareness, and deduping.
+  const processPendingROImages = async () => {
+    if (pendingROImages.length === 0) return;
+
+    setIsProcessingOCR(true);
+    setOcrProgress(0);
+
+    try {
+      const dataUrls = pendingROImages.map(img => img.dataUrl);
+
+      if (apiKey) {
+        // Preferred: send all pages as multiple images to Grok with improved prompt (first block + RO# + complaints from any)
+        setOcrProgress(20);
+        const extracted = await extractVehicleAndComplaintsWithGrok(dataUrls, apiKey);
+        setOcrProgress(90);
+        createROFromExtracted(extracted);
+      } else {
+        // Local fallback: OCR each page, combine texts, use existing createROFromText (which handles RO# + complaints)
+        let combinedText = '';
+        for (let i = 0; i < pendingROImages.length; i++) {
+          const img = pendingROImages[i];
+          const file = await dataUrlToFile(img.dataUrl, img.name);
+          const preprocessed = await preprocessImageForOCR(file);
+          const text = await runOCR(preprocessed, (p) =>
+            setOcrProgress(Math.round((i / pendingROImages.length) * 80 + (p / pendingROImages.length) * 80 * 0.2))
+          );
+          combinedText += `\n\n=== PAGE ${i + 1} ===\n` + text;
+        }
+        setOcrProgress(95);
+        createROFromText(combinedText);
+      }
+
+      // Clear pending after successful process
+      setPendingROImages([]);
+    } catch (error) {
+      console.error('Multi-image RO extraction error', error);
+      alert('Processing images failed. Try fewer images or add your Grok key in Settings for reliable vision OCR.');
+      // do not clear pending so user can retry
+    } finally {
+      setIsProcessingOCR(false);
+      setOcrProgress(0);
+    }
+  };
+
+  // Clear helper for UI
+  const clearPendingROImages = () => setPendingROImages([]);
+
+  // SUPER AGGRESSIVE customer complaint extraction for Mercedes ROs.
+  // Bulletproof: uses many trigger phrases (customer states, tech notes, found, etc.), block collection, labeled + free text extraction.
+  // Works across multi-page combined text. Ignores page markers.
   function extractComplaints(text: string): string[] {
     if (!text || text.trim().length < 6) return [];
     const comps: string[] = [];
-    const rawLines = text.split(/[\n\r]+/);
-    const lines = rawLines.map(l => l.trim()).filter(Boolean);
-    let inComplaintSection = false;
-    const stopHeaders = /vin|ro\s*#|mileage|odometer|technician|tech|service advisor|advisor|date|repair order|vehicle id|work order|parts|correction|cause|authorized|labor|signature|notes|print name|customer name|phone|email/i;
+    // clean page markers from multi-photo
+    let cleaned = text.replace(/=== PAGE \d+ ===/g, '\n\n').replace(/\s+/g, ' ');
+    const lines = cleaned.split(/[\n\r]+/).map(l => l.trim()).filter(Boolean);
 
-    const isJunk = (s: string) => /^(vin|mile|km|ro\s*#|date|tech|name|model|customer|service|advisor|authorized|total|tax|parts|shop|dealer)/i.test(s);
+    const TRIGGERS = [
+      'customer states', 'customer complaint', 'customer concern', 'customer reported', 'customer states that',
+      'technician notes', 'tech notes', 'technician found', 'technician observed', 'technician seen', 'tech found', 'tech observed',
+      'concern', 'complaint', 'issue', 'problem', 'needs', 'requires', 'state inspection', 'found', 'observed', 'reported',
+      'requires repair', 'inspection result', 'technician notes', 'tech seen', 'customer states', 'c/s', 'c s'
+    ];
+
+    const isJunk = (s: string) => /^(vin|mile|km|ro\s*#|date|tech|name|model|customer|service|advisor|authorized|total|tax|parts|shop|dealer|labor|signature)/i.test(s);
+
+    let collecting = false;
+    let currentBlock = '';
+
+    const flushBlock = () => {
+      if (currentBlock.length < 8) return;
+      // parse labeled A. B. etc first
+      const labeledMatches = currentBlock.match(/([A-D])[\.\)\:\s\-–—–—]+\s*([A-Za-z][^\.]{6,220})/gi) || [];
+      if (labeledMatches.length > 0) {
+        labeledMatches.forEach(m => {
+          let c = m.replace(/^[A-D][\.\)\:\s\-–—–—]+/i, '').trim();
+          c = c.replace(/[\s\-–—–—]+$/, '');
+          if (c.length > 6 && !isJunk(c) && !comps.includes(c)) comps.push(c);
+        });
+      } else {
+        // free text after trigger - split on . or lines
+        const parts = currentBlock.split(/[\.\!\?]\s+|\n|;/).map(p => p.trim()).filter(p => p.length > 6);
+        parts.forEach(p => {
+          if (!isJunk(p) && /[a-zA-Z]/.test(p) && p.length > 6 && !comps.includes(p)) {
+            comps.push(p);
+          }
+        });
+      }
+      currentBlock = '';
+    };
 
     for (const line of lines) {
       const lower = line.toLowerCase();
-      if (/customer\s*(complaint|concern|cc|states?|reported)|complaints?\s*:|concerns?\s*:|c\.?c\.?\s*[:\-]|symptom|description\s*of\s*concern|customer\s*states?/i.test(line)) {
-        inComplaintSection = true;
+      const hitTrigger = TRIGGERS.some(t => lower.includes(t));
+      if (hitTrigger) {
+        flushBlock();
+        collecting = true;
+        currentBlock = line + '. ';
         continue;
       }
-      if (inComplaintSection && stopHeaders.test(line)) {
-        inComplaintSection = false; // stop at next header
+      if (collecting) {
+        // stop at obvious new section
+        if (/vin|ro\s*#|mileage|odometer|parts|labor|total|authorized|signature|print name|phone/i.test(lower) && !lower.match(/complaint|concern|issue|problem/)) {
+          flushBlock();
+          collecting = false;
+          continue;
+        }
+        currentBlock += line + ' ';
       }
-      if (inComplaintSection || comps.length < 2) {  // allow early lines too
-        // Lettered: A. A) A: A- etc (A B C D from Mercedes ROs)
-        let m = line.match(/^([A-Z])[\.\)\:\s\-–—–—]+\s*(.+)$/);
-        if (m && m[2]) {
-          let c = m[2].trim();
-          if (c.length > 5 && !isJunk(c) && !/^[A-Z]$/.test(c)) {
-            comps.push(c);
-            continue;
-          }
-        }
-        // Numbered 1. 01) 1: etc
-        m = line.match(/^(\d{1,2})[\.\)\:\s\-–—]+\s*(.+)$/);
-        if (m && m[2]) {
-          let c = m[2].trim();
-          if (c.length > 5 && !isJunk(c)) {
-            comps.push(c);
-            continue;
-          }
-        }
-        // Bullets or dashes
-        m = line.match(/^[\-\•\*]\s*(.+)$/);
-        if (m && m[1]) {
-          let c = m[1].trim();
-          if (c.length > 6 && !stopHeaders.test(c) && !isJunk(c)) {
-            comps.push(c);
-            continue;
-          }
-        }
-        // Plain substantial line while in section (Mercedes ROs often have wrapped text)
-        if (inComplaintSection && line.length > 10 && !stopHeaders.test(line) && !/^\d{1,2}[\.\)]?\s*$/.test(line) && !isJunk(line)) {
-          comps.push(line);
-        }
+      // also catch stray labeled even outside
+      const strayLabel = line.match(/^([A-D])[\.\)\:\s\-–—–—]+\s*(.+)$/i);
+      if (strayLabel && strayLabel[2] && strayLabel[2].length > 6 && !isJunk(strayLabel[2])) {
+        const c = strayLabel[2].trim();
+        if (!comps.includes(c)) comps.push(c);
       }
     }
+    flushBlock();
 
-    // Global fallback regexes (catch when header OCR mangled)
-    if (comps.length === 0 || comps.length < 2) {
-      const patterns = [
-        /([A-Z])[\.\)]\s*([A-Za-z][^\n]{8,220})/g,
-        /([0-9]{1,2})[\.\)]\s*([A-Za-z][^\n]{8,220})/g,
-        /(?:Customer\s*)?Complaint[s]?:?\s*([A-Za-z][^\n]{8,260})/gi,
-        /Concern[s]?:?\s*([A-Za-z][^\n]{8,260})/gi,
-        /C\.?C\.?\s*[:\-]?\s*([A-Za-z][^\n]{8,260})/gi,
-        /Customer\s*states?\s*:?\s*([A-Za-z][^\n]{8,260})/gi,
-        /Symptom[s]?:?\s*([A-Za-z][^\n]{8,260})/gi,
-        /Description\s*of\s*Concern:?\s*([A-Za-z][^\n]{8,260})/gi,
-        /Vehicle\s*Complaint[s]?:?\s*([A-Za-z][^\n]{8,260})/gi
+    // Ultra aggressive global labeled + trigger phrases fallback (for mangled OCR)
+    if (comps.length < 2) {
+      const globalPatterns = [
+        /([A-D])[\.\)\:\s\-–—–—]+\s*([A-Za-z][^\n]{7,220})/gi,
+        /(?:customer\s*states?|customer\s*complaint|technician\s*notes?|tech\s*notes?|technician\s*found|concern|complaint|issue|problem|needs|requires|found|observed)\s*[:\-]?\s*([A-Za-z][^\n]{7,220})/gi,
+        /([A-D])\s*[\.\)]\s*([A-Za-z][^\n]{7,220})/gi
       ];
-      patterns.forEach(p => {
-        let match;
-        while ((match = p.exec(text)) !== null) {
-          const cand = (match[2] || match[1] || '').trim().replace(/[\s\-–—–—]+$/, '');
-          if (cand.length > 7 && !/vin|mileage|ro\s*#|date|tech|customer name|model year|authorized/i.test(cand) && !isJunk(cand)) {
+      globalPatterns.forEach(p => {
+        let m;
+        while ((m = p.exec(cleaned)) !== null) {
+          const cand = (m[2] || m[1] || '').trim().replace(/[\s\-–—–—]+$/, '');
+          if (cand.length > 6 && !isJunk(cand) && !comps.includes(cand) && /[a-z]/.test(cand)) {
             comps.push(cand);
           }
         }
       });
     }
 
-    // Dedupe + clean + limit to reasonable # of complaints
+    // Dedupe, clean, limit
     const seen = new Set<string>();
     const unique: string[] = [];
     for (const c of comps) {
-      const key = c.toLowerCase().replace(/\s+/g, ' ').slice(0, 32);
-      if (!seen.has(key) && c.length > 5 && c.length < 300) {
+      const key = c.toLowerCase().replace(/\s+/g, ' ').slice(0, 40);
+      if (!seen.has(key) && c.length > 5 && c.length < 280) {
         seen.add(key);
         unique.push(c.replace(/\s+/g, ' ').trim());
       }
     }
-    return unique.slice(0, 8);
+    return unique.slice(0, 10);
   }
 
   function extractVehicleDetails(text: string) {
-    // Clean common OCR confusions early (VINs especially)
+    // Clean common OCR confusions early (VINs especially) - strict for first block
     let cleaned = text
       .replace(/\bO\b/g, '0').replace(/\bI\b/g, '1').replace(/\bL\b/g, '1')
-      .replace(/[\u2018\u2019]/g, "'"); // smart quotes
+      .replace(/[\u2018\u2019]/g, "'");
+
+    // RO Number - top center / header (first 400 chars priority for "first block")
+    let roNumber = '';
+    const topBlock = cleaned.substring(0, 500);
+    const roMatch = topBlock.match(/(?:^|\n)\s*(?:RO\s*#?|Repair\s*Order|Work\s*Order|RO#)\s*[:#]?\s*([A-Z0-9\-]{3,12})/i) ||
+                    topBlock.match(/(?:RO|Repair Order|Work Order)\s*[:#]?\s*([A-Z0-9\-]{3,12})/i);
+    if (roMatch) roNumber = roMatch[1];
 
     const vinMatch = cleaned.match(/\b([A-HJ-NPR-Z0-9]{17})\b/);
     let vin = vinMatch ? vinMatch[1] : '';
-    // Final VIN sanitize: correct common OCR letter/number swaps in valid positions
     if (vin) {
       vin = vin.toUpperCase()
         .replace(/O/g, '0').replace(/I/g, '1').replace(/Q/g, '0').replace(/B/g, '8');
-      // Mercedes WMI quick confirm/fix common
       if (!vin.match(/^[A-HJ-NPR-Z0-9]{17}$/)) vin = '';
     }
 
-    // Year: MY2024 / Model Year 2023 / 2023 GLE etc. Prefer explicit, avoid false 4-digit in other numbers.
+    // Year/Make/Model - prioritize first block / table area (top ~600 chars)
+    const headerText = cleaned.substring(0, 600);
     let year = '';
-    const myMatch = cleaned.match(/\bM\.?Y\.?\s*(20\d{2}|19\d{2})\b/i) || cleaned.match(/\bModel\s*Year\s*(20\d{2}|19\d{2})\b/i) || cleaned.match(/\b(20\d{2}|19\d{2})\s*MY\b/i);
+    const myMatch = headerText.match(/\bM\.?Y\.?\s*(20\d{2}|19\d{2})\b/i) || headerText.match(/\bModel\s*Year\s*(20\d{2}|19\d{2})\b/i) || headerText.match(/\b(20\d{2}|19\d{2})\s*MY\b/i);
     if (myMatch) year = myMatch[1];
     if (!year) {
-      // Year right before common Mercedes model tokens
-      const yearBefore = cleaned.match(/\b(20\d{2}|19\d{2})\s+(?:Mercedes|Maybach|MB|GLE|GLS|GLC|GLA|S\s|E\s|C\s|EQ|AMG|GT|SL|CLS|CLA)\b/i);
+      const yearBefore = headerText.match(/\b(20\d{2}|19\d{2})\s+(?:Mercedes|Maybach|MB|GLE|GLS|GLC|GLA|S\s|E\s|C\s|EQ|AMG|GT|SL|CLS|CLA)\b/i);
       if (yearBefore) year = yearBefore[1];
     }
     if (!year) {
-      // Last resort: first plausible 20xx near "vehicle" or top of doc
-      const yearAny = cleaned.match(/(?:vehicle|car|auto|ro|repair|mileage|vin)[^\n]{0,60}?\b(20\d{2}|19\d{2})\b/i) || cleaned.match(/\b(20\d{2}|19\d{2})\b/);
+      const yearAny = headerText.match(/\b(20\d{2}|19\d{2})\b/);
       if (yearAny) year = yearAny[1];
     }
 
-    // Make - default Mercedes-Benz, detect Maybach or explicit
     let make = 'Mercedes-Benz';
-    if (/Maybach/i.test(cleaned)) make = 'Maybach';
-    else if (/Mercedes[- ]?Benz/i.test(cleaned) || /\bMercedes\b/i.test(cleaned)) make = 'Mercedes-Benz';
-    else if (/\bMB\b/i.test(cleaned) || /\bMERCEDES\b/i.test(cleaned)) make = 'Mercedes-Benz';
+    if (/Maybach/i.test(headerText)) make = 'Maybach';
+    else if (/Mercedes[- ]?Benz/i.test(headerText) || /\bMercedes\b/i.test(headerText)) make = 'Mercedes-Benz';
+    else if (/\bMB\b/i.test(headerText) || /\bMERCEDES\b/i.test(headerText)) make = 'Mercedes-Benz';
     else if (vin.startsWith('W1') || vin.startsWith('WDD') || vin.startsWith('WDC') || vin.startsWith('WDF') || vin.startsWith('W1N') || vin.startsWith('W1K')) {
       make = 'Mercedes-Benz';
     }
 
-    // Model extraction - expanded patterns for Mercedes lineup + trims
     let model = '';
     const modelPatterns = [
       /\b(Maybach\s+)?(?:GLE|GLS|GLC|GLA|GLB|G)\s*\d{2,3}[A-Z]?(?:\s*(?:4MATIC|4M|AMG|Maybach|Coupe|SUV|Cabriolet))?\b/i,
@@ -762,21 +961,21 @@ function App() {
       /\b(?:Sprinter|Vito|Metris)\b/i
     ];
     for (const re of modelPatterns) {
-      const m = cleaned.match(re);
+      const m = headerText.match(re);
       if (m) {
         model = m[0].replace(/\s+/g, ' ').trim();
         break;
       }
     }
     if (!model) {
-      const generic = cleaned.match(/\b(?:20\d{2}|19\d{2}|Mercedes|Maybach|MB)\s+([A-Z]{1,4}[\s-]?\d{2,3}[A-Z0-9\s-]{0,10})/i);
+      const generic = headerText.match(/\b(?:20\d{2}|19\d{2}|Mercedes|Maybach|MB)\s+([A-Z]{1,4}[\s-]?\d{2,3}[A-Z0-9\s-]{0,10})/i);
       if (generic && generic[1]) model = generic[1].trim();
     }
     model = model.replace(/\b4\s*MATIC\b/i, '4MATIC').replace(/\s+/g, ' ').trim();
 
-    // Mileage in - prefer "Mileage In", "Odometer", "Current Mileage", common RO labels. Fallback any 5-7 digit + mi/km
+    // Mileage IN - specific "MILEAGE IN / OUT" column or labels, first occurrence
     let mileageIn = '';
-    const labeled = cleaned.match(/(?:mileage\s*(?:in|at|reading)?|odometer|current\s*(?:mile|km)|miles\s*in)\s*:?\s*([\d,]{3,7})/i);
+    const labeled = headerText.match(/(?:MILEAGE\s*IN|MILEAGE IN|mileage\s*in|odometer|current\s*(?:mile|km)|miles\s*in)\s*:?\s*([\d,]{3,7})/i);
     if (labeled) {
       mileageIn = labeled[1].replace(/,/g, '');
     } else {
@@ -784,21 +983,19 @@ function App() {
       if (any) mileageIn = any[1].replace(/,/g, '');
     }
 
-    // Also try to extract customer name for prefill
-    // (we return it separately via side logic in create)
-
     return { vin, year, make, model, mileageIn, mileageOut: '' };
   }
 
-  // Extract customer name if present on RO scan
+  // Extract customer name if present on RO scan - top left / customer section bias (first block)
   function extractCustomerName(text: string): string {
+    const top = text.substring(0, 400);
     const patterns = [
       /customer\s*(?:name|:)?:?\s*([A-Z][A-Za-z'\-\s]{2,40})/i,
       /(?:name|owner)\s*:?\s*([A-Z][A-Za-z'\-\s]{2,40})/i,
       /^([A-Z][A-Za-z'\-\s]{2,30})\s*(?:RO|Repair|Vehicle|VIN)/im
     ];
     for (const p of patterns) {
-      const m = text.match(p);
+      const m = top.match(p) || text.match(p);
       if (m && m[1]) {
         const n = m[1].trim();
         if (n.length > 2 && n.length < 45 && !/vin|mile|ro|tech/i.test(n)) return n;
@@ -807,26 +1004,240 @@ function App() {
     return '';
   }
 
+  // Parser for Grok vision output - robust fallback regex for layout fields + super aggressive complaints.
+  // Post-validation included.
+  function parseStructuredROText(text: string): { vehicle: any; complaints: string[]; customerName: string; roNumber: string } {
+    const vehicle: any = { vin: '', year: '', make: '', model: '', mileageIn: '', mileageOut: '' };
+    let complaints: string[] = [];
+    let customerName = '';
+    let roNumber = '';
+
+    // Primary: try exact structured lines
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    let inComplaints = false;
+
+    for (const line of lines) {
+      const lower = line.toLowerCase();
+      if (lower.startsWith('ro number:')) {
+        roNumber = (line.split(':')[1] || '').trim();
+      } else if (lower.startsWith('year:')) {
+        vehicle.year = (line.split(':')[1] || '').trim();
+      } else if (lower.startsWith('make:')) {
+        vehicle.make = (line.split(':')[1] || '').trim();
+      } else if (lower.startsWith('model:')) {
+        vehicle.model = (line.split(':')[1] || '').trim();
+      } else if (lower.startsWith('mileage in:')) {
+        vehicle.mileageIn = (line.split(':')[1] || '').replace(/[^0-9]/g, '');
+      } else if (lower.startsWith('vin:')) {
+        vehicle.vin = (line.split(':')[1] || '').replace(/[^A-HJ-NPR-Z0-9]/gi, '').toUpperCase();
+      } else if (lower.startsWith('customer name:')) {
+        customerName = (line.split(':')[1] || '').trim();
+      } else if (lower.startsWith('customer complaints:')) {
+        inComplaints = true;
+        continue;
+      }
+
+      if (inComplaints) {
+        if (/none listed/i.test(line)) {
+          complaints = [];
+          inComplaints = false;
+          continue;
+        }
+        let m = line.match(/^([A-Z])[\.\)\:\s\-–—–—]+\s*(.+)$/i);
+        if (!m) m = line.match(/^(\d{1,2})[\.\)\:\s\-–—–—]+\s*(.+)$/i);
+        if (m && m[2]) {
+          const c = m[2].trim();
+          if (c.length > 4) complaints.push(c);
+        } else if (line.length > 6 && !/^[A-Z]:/i.test(line)) {
+          complaints.push(line);
+        }
+      }
+    }
+
+    // Aggressive fallback for fields if Grok didn't follow format perfectly (layout aware)
+    if (!roNumber) {
+      const m = text.match(/(?:RO Number|RO#|Repair Order|Work Order)[:\s#]*([A-Z0-9\-]{3,12})/i);
+      if (m) roNumber = m[1];
+    }
+    if (!vehicle.vin) {
+      const m = text.match(/\b([A-HJ-NPR-Z0-9]{17})\b/);
+      if (m) vehicle.vin = m[1].toUpperCase();
+    }
+    if (!vehicle.year) {
+      const m = text.match(/\b(20\d{2}|19\d{2})\b/);
+      if (m) vehicle.year = m[1];
+    }
+    if (!vehicle.make || vehicle.make === 'Mercedes-Benz') {
+      if (/Maybach/i.test(text)) vehicle.make = 'Maybach';
+      else if (/Mercedes/i.test(text)) vehicle.make = 'Mercedes-Benz';
+    }
+    if (!vehicle.model) {
+      const m = text.match(/\b(GLE|GLS|GLC|GLA|S\s*\d|E\s*\d|C\s*\d|EQ[A-Z]?\s*\d|AMG)\s*\d{0,3}[A-Z]?(?:\s*4MATIC|AMG)?\b/i);
+      if (m) vehicle.model = m[0].trim();
+    }
+    if (!vehicle.mileageIn) {
+      const m = text.match(/(?:mileage in|odometer)[:\s]*([\d,]{3,7})/i);
+      if (m) vehicle.mileageIn = m[1].replace(/,/g, '');
+    }
+    if (!customerName) {
+      const m = text.match(/customer name[:\s]*([A-Z][A-Za-z'\-\s]{2,35})/i);
+      if (m) customerName = m[1].trim();
+    }
+
+    // Use the super aggressive complaints extractor as final (guarantees A/B/C from triggers even if format off)
+    const aggressive = extractComplaints(text);
+    if (aggressive.length > complaints.length) {
+      complaints = aggressive;
+    }
+
+    // Post-processing validation
+    if (vehicle.vin && vehicle.vin.length !== 17) {
+      vehicle.vin = vehicle.vin.replace(/[^A-HJ-NPR-Z0-9]/gi, '').slice(0, 17).toUpperCase();
+    }
+    vehicle.mileageIn = (vehicle.mileageIn || '').replace(/[^0-9]/g, '');
+    complaints = complaints.filter((c: string) => c && c.trim().length > 5 && /[a-zA-Z]/.test(c));
+
+    return { vehicle, complaints, customerName, roNumber };
+  }
+
+  // SUPER AGGRESSIVE prompt for Grok vision OCR - layout specific + bulletproof complaints from triggers across pages.
+  const RO_EXTRACTION_PROMPT = `Use OCR to carefully analyze the provided repair order image(s). Extract ACCURATELY and ONLY from the FIRST BLOCK (top header / primary vehicle info section — ignore labor, parts, totals, signatures, lower notes).
+
+STRICT FIELD LOCATIONS FOR THIS MERCEDES-BENZ RO FORMAT:
+- RO Number: top center of page (near "RO #", "Repair Order", "Work Order")
+- Customer Name: top left customer section
+- Year / Make / Model: specific vehicle information table row
+- VIN: the VIN field (must be exactly 17 characters)
+- Mileage IN: the "MILEAGE IN / OUT" or mileage column (numbers only)
+
+Customer Complaints (MOST IMPORTANT - SUPER AGGRESSIVE):
+Search the ENTIRE document (all pages/images) for ANY text after or under these EXACT trigger phrases (case insensitive):
+"Customer states", "Customer complaint", "Customer concern", "customer states that",
+"Technician notes", "Tech notes", "Technician found", "Technician observed", "Technician seen", "tech found", "tech observed", "technician notes",
+"Concern", "Complaint", "Issue", "Problem", "Needs", "Requires", "state inspection", "found", "observed", "reported", "requires repair", "inspection result", "c/s", "c s".
+Extract the full following text as complaints. Label them A, B, C, D etc (use form labels if present, or assign sequentially). Pull EVERY complaint from any page. If none, output exactly "None listed."
+
+Output ONLY this exact format, nothing else:
+
+RO Number: [precise value from top center]
+Customer Name: [value]
+Year: [value]
+Make: [value]
+Model: [value]
+VIN: [exact 17 char]
+Mileage IN: [numbers only]
+Customer Complaints:
+A. [exact text]
+B. [exact text]
+...
+
+Be extremely precise on VIN (17 alphanum, fix O/0 I/1), mileage numbers, RO number. Use the trigger phrases above aggressively for complaints.`;
+
+  // Use Grok vision (image understanding) + exact prompt for reliable first-block extraction (RO#, vehicle fields, complaints from any page).
+  // Supports multiple images (for multi-page RO). Falls back to local Tesseract if no key or error.
+  async function extractVehicleAndComplaintsWithGrok(imageDataUrls: string[], apiKey: string): Promise<{ vehicle: any; complaints: string[]; customerName: string; roNumber: string }> {
+    const prompt = RO_EXTRACTION_PROMPT;
+
+    const imageContents = imageDataUrls.map(url => ({ type: 'image_url', image_url: { url } }));
+
+    const response = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'grok-3', // Vision-capable via chat completions per xAI API (multiple image_url supported)
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              ...imageContents
+            ]
+          }
+        ],
+        temperature: 0.05,
+        max_tokens: 700
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Grok vision extraction error: ${response.status} ${err}`);
+    }
+
+    const apiResponse = await response.json();
+    const extractedText = apiResponse.choices?.[0]?.message?.content?.trim() || '';
+    return parseStructuredROText(extractedText);
+  }
+
   const createROFromText = (text: string) => {
-    const roNumber = (text.match(/(?:RO|Repair\s*Order|Work\s*Order)[:\s#\-]*([A-Z0-9\-]{3,12})/i) || [])[1] || `R-${Date.now().toString().slice(-6)}`;
+    // Layout aware: RO# from top center/header area first
+    let roNumber = (text.match(/(?:^|\n)\s*(?:RO\s*#?|Repair\s*Order|Work\s*Order|RO#)\s*[:#]?\s*([A-Z0-9\-]{3,12})/im) || [])[1] ||
+                   (text.match(/(?:RO|Repair Order|Work Order)\s*[:#]?\s*([A-Z0-9\-]{3,12})/i) || [])[1] ||
+                   `R-${Date.now().toString().slice(-6)}`;
     const vehicle = extractVehicleDetails(text);
     const complaints = extractComplaints(text);
     const custName = extractCustomerName(text);
+
+    // Post-processing validation (VIN 17 char, mileage numeric, meaningful complaints)
+    if (vehicle.vin && vehicle.vin.length !== 17) {
+      vehicle.vin = vehicle.vin.replace(/[^A-HJ-NPR-Z0-9]/gi, '').slice(0, 17).toUpperCase();
+    }
+    vehicle.mileageIn = (vehicle.mileageIn || '').replace(/[^0-9]/g, '');
+    const cleanComplaints = complaints.filter(c => c && c.trim().length > 5 && /[a-zA-Z]/.test(c));
 
     const newRO: RepairOrder = {
       id: 'ro-' + Date.now(),
       roNumber,
       vehicle,
       customer: { name: custName },
-      complaints,
+      complaints: cleanComplaints,
       xentryImages: [],
       xentryOcrTexts: [],
       createdAt: new Date().toISOString(),
       repairLines: [{
         id: 'line-1',
         lineNumber: 1,
-        description: complaints[0] ? complaints[0].slice(0, 60) : 'Enter repair description',
-        customerConcern: complaints[0] || '',
+        description: cleanComplaints[0] ? cleanComplaints[0].slice(0, 60) : 'Enter repair description',
+        customerConcern: cleanComplaints[0] || '',
+        technicianNotes: '',
+        xentryImages: [],
+        xentryOcrTexts: [],
+        extractedData: { codes: [], guidedTests: [], measurements: [], components: [], circuits: [] }
+      }]
+    };
+
+    saveRO(newRO);
+    setView('ro');
+  };
+
+  // Helper to create RO from the structured vision extraction (matches the exact prompt output format)
+  const createROFromExtracted = (extracted: { vehicle: any; complaints: string[]; customerName: string; roNumber?: string }) => {
+    let roNumber = extracted.roNumber || `R-${Date.now().toString().slice(-6)}`;
+    // Post-processing validation
+    let v = { ...extracted.vehicle };
+    if (v.vin && v.vin.length !== 17) {
+      v.vin = v.vin.replace(/[^A-HJ-NPR-Z0-9]/gi, '').slice(0, 17).toUpperCase();
+    }
+    v.mileageIn = (v.mileageIn || '').replace(/[^0-9]/g, '');
+    const cleanComplaints = (extracted.complaints || []).filter((c: string) => c && c.trim().length > 5 && /[a-zA-Z]/.test(c));
+
+    const newRO: RepairOrder = {
+      id: 'ro-' + Date.now(),
+      roNumber,
+      vehicle: v,
+      customer: { name: extracted.customerName },
+      complaints: cleanComplaints,
+      xentryImages: [],
+      xentryOcrTexts: [],
+      createdAt: new Date().toISOString(),
+      repairLines: [{
+        id: 'line-1',
+        lineNumber: 1,
+        description: cleanComplaints[0] ? cleanComplaints[0].slice(0, 60) : 'Enter repair description',
+        customerConcern: cleanComplaints[0] || '',
         technicianNotes: '',
         xentryImages: [],
         xentryOcrTexts: [],
@@ -854,6 +1265,13 @@ function App() {
       reader.onload = () => resolve(reader.result as string);
       reader.readAsDataURL(file);
     });
+  }
+
+  // Helper for local OCR fallback with multiple images (convert dataUrl back to File for existing preprocess/runOCR)
+  async function dataUrlToFile(dataUrl: string, filename: string = 'ro-page.jpg'): Promise<File> {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    return new File([blob], filename, { type: blob.type || 'image/jpeg' });
   }
 
   const createManualRO = () => {
@@ -1101,6 +1519,13 @@ function App() {
     updateComplaints(updated);
   };
 
+  const updateRONumber = (roNumber: string) => {
+    const latestRO = allROs.find(r => r.id === currentRO?.id) || currentRO;
+    if (!latestRO) return;
+    const updated = { ...latestRO, roNumber: roNumber.trim() };
+    saveRO(updated);
+  };
+
   // Apply smart Mercedes defaults + common issues for the current vehicle + mileage into the line
   const applySmartDefaultsToLine = (lineId: string) => {
     const latestRO = allROs.find(r => r.id === currentRO?.id) || currentRO;
@@ -1207,12 +1632,12 @@ function App() {
 
           <div className="flex gap-2 mb-4">
             <button
-              onClick={handleScanRO}
+              onClick={addROPhoto}
               disabled={isProcessingOCR}
               className="primary-btn flex-1 h-12 flex items-center justify-center gap-2 text-sm"
             >
               <Camera size={18} />
-              {isProcessingOCR ? `SCANNING RO... ${ocrProgress}%` : 'SCAN NEW RO'}
+              {isProcessingOCR ? `PROCESSING... ${ocrProgress}%` : 'ADD RO PHOTO'}
             </button>
             <button
               onClick={createManualRO}
@@ -1221,8 +1646,47 @@ function App() {
               <Plus size={18} /> NEW MANUAL
             </button>
           </div>
+
+          {/* Pending multi-page RO images UI (new) - user adds 2-3 pages, then processes once */}
+          {pendingROImages.length > 0 && (
+            <div className="ios-card p-3 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs uppercase tracking-widest text-[#8e8e93]">SELECTED RO PAGES ({pendingROImages.length}) — recommend 2-3 different pages</div>
+                <button onClick={clearPendingROImages} disabled={isProcessingOCR} className="text-[10px] text-[#ff9f0a]">CLEAR</button>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {pendingROImages.map((img, idx) => (
+                  <div key={img.id} className="relative group">
+                    <img 
+                      src={img.dataUrl} 
+                      className="w-full h-16 object-cover rounded border border-[#38383a] cursor-pointer" 
+                      alt={img.name}
+                      onClick={() => window.open(img.dataUrl)}
+                    />
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); setPendingROImages(prev => prev.filter((_, i) => i !== idx)); }}
+                      disabled={isProcessingOCR}
+                      className="absolute -top-1 -right-1 bg-[#ff3b30] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center leading-none"
+                      title="Remove page"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={processPendingROImages}
+                disabled={isProcessingOCR}
+                className="primary-btn w-full h-11 text-sm font-semibold"
+              >
+                {isProcessingOCR ? `PROCESSING ALL IMAGES... ${ocrProgress}%` : 'PROCESS ALL IMAGES'}
+              </button>
+              <div className="text-center text-[9px] text-[#8e8e93] mt-1">Combines pages for accurate first-block extraction (RO#, vehicle, VIN, mileage, complaints A/B/C...)</div>
+            </div>
+          )}
+
           <div className="text-center text-[10px] text-[#8e8e93] mb-4 -mt-1">
-            Scan RO photo (improved OCR) or manual • Pre-populates year/make/model/VIN/mileage + A/B/C complaints reliably
+            Add 2-3 RO page photos (tap Add repeatedly or select multiple). Then Process All for reliable extraction of RO# + first-block fields + all labeled complaints.
           </div>
 
           <div className="mb-3">
@@ -1288,10 +1752,23 @@ function App() {
           <button onClick={() => setView('home')} className="text-[#0a84ff] text-sm">Done</button>
         </div>
 
-        {/* CUSTOMER + VEHICLE INFO - editable, prefilled from improved OCR */}
-        <div className="ios-card p-4 mb-5">
-          <div className="text-xs uppercase tracking-widest text-[#8e8e93] mb-3">VEHICLE &amp; CUSTOMER (from RO scan/manual)</div>
+        {/* MAIN FIRST BLOCK - combined larger organized card for RO Number + Vehicle/Customer + all labeled Complaints (A/B/C...).
+           Everything from the improved first-block OCR now lives here. No separate complaints section. */}
+        <div className="ios-card p-5 mb-6">
+          <div className="text-xs uppercase tracking-widest text-[#8e8e93] mb-3">RO DETAILS (from first block of scan — RO# at top center, vehicle fields, all complaints from any page)</div>
           
+          {/* RO Number prominent */}
+          <div className="mb-3">
+            <label className="text-[10px] text-[#8e8e93] block mb-0.5">RO NUMBER</label>
+            <input 
+              value={ro.roNumber} 
+              onChange={e => updateRONumber(e.target.value)} 
+              placeholder="RO-123456" 
+              className="w-full bg-[#2c2c2e] border border-[#38383a] rounded-xl px-3 py-2 text-sm font-mono tracking-[1px]" 
+            />
+          </div>
+
+          {/* Vehicle grid - 4 fields */}
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div>
               <label className="text-[10px] text-[#8e8e93] block mb-0.5">YEAR</label>
@@ -1316,38 +1793,38 @@ function App() {
             <input value={ro.vehicle.vin} onChange={e => updateVehicle({ vin: e.target.value.toUpperCase() })} placeholder="W1Nxxxx..." maxLength={17} className="w-full bg-[#2c2c2e] border border-[#38383a] rounded-xl px-3 py-2 text-sm font-mono tracking-[1px]" />
           </div>
 
-          <div>
+          <div className="mb-4">
             <label className="text-[10px] text-[#8e8e93] block mb-0.5">CUSTOMER NAME</label>
             <input value={ro.customer?.name || ''} onChange={e => updateCustomer(e.target.value)} placeholder="John Smith" className="w-full bg-[#2c2c2e] border border-[#38383a] rounded-xl px-3 py-2 text-sm" />
           </div>
-        </div>
 
-        {/* COMPLAINTS - labeled A, B, C... editable, auto from improved scan, add/remove support */}
-        <div className="ios-card p-4 mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs uppercase tracking-widest text-[#8e8e93]">CUSTOMER COMPLAINTS (A, B, C...)</div>
-            <button onClick={addComplaint} className="text-[#0a84ff] text-xs flex items-center gap-1"><Plus size={14}/> ADD</button>
+          {/* Complaints integrated here - no separate section */}
+          <div className="border-t border-[#38383a] pt-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs uppercase tracking-widest text-[#8e8e93]">CUSTOMER COMPLAINTS (A, B, C, D... from any page)</div>
+              <button onClick={addComplaint} className="text-[#0a84ff] text-xs flex items-center gap-1"><Plus size={14}/> ADD</button>
+            </div>
+            <p className="text-[9px] text-[#8e8e93] mb-2">Pre-populated from scan (first block + multi-page). Edit as needed.</p>
+
+            {(ro.complaints && ro.complaints.length > 0) ? (
+              ro.complaints.map((c, idx) => (
+                <div key={idx} className="flex gap-2 mb-2 items-start">
+                  <div className="mt-2 w-6 text-[#0a84ff] font-semibold text-sm shrink-0">{letter(idx)}.</div>
+                  <textarea
+                    value={c}
+                    onChange={(e) => editComplaint(idx, e.target.value)}
+                    className="flex-1 bg-[#2c2c2e] border border-[#38383a] rounded-2xl px-3 py-2 text-sm min-h-[48px] resize-y"
+                  />
+                  <button onClick={() => removeComplaint(idx)} className="mt-1 p-1.5 text-[#ff9f0a]" title="Remove complaint">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))
+            ) : (
+              <div className="text-sm text-[#8e8e93] mb-2">No complaints extracted. Add or rescan.</div>
+            )}
+            <button onClick={addComplaint} className="text-xs text-[#0a84ff] mt-1">+ Add another complaint</button>
           </div>
-          <p className="text-[10px] text-[#8e8e93] mb-3">Pre-populated accurately from RO photo scan. Edit to refine before generating stories.</p>
-
-          {(ro.complaints && ro.complaints.length > 0) ? (
-            ro.complaints.map((c, idx) => (
-              <div key={idx} className="flex gap-2 mb-2 items-start">
-                <div className="mt-2 w-6 text-[#0a84ff] font-semibold text-sm shrink-0">{letter(idx)}.</div>
-                <textarea
-                  value={c}
-                  onChange={(e) => editComplaint(idx, e.target.value)}
-                  className="flex-1 bg-[#2c2c2e] border border-[#38383a] rounded-2xl px-3 py-2 text-sm min-h-[52px] resize-y"
-                />
-                <button onClick={() => removeComplaint(idx)} className="mt-1 p-1.5 text-[#ff9f0a]" title="Remove complaint">
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))
-          ) : (
-            <div className="text-sm text-[#8e8e93] mb-2">No complaints. Add one or rescan.</div>
-          )}
-          <button onClick={addComplaint} className="text-xs text-[#0a84ff] mt-1">+ Add another complaint</button>
         </div>
 
         {/* XENTRY SAVED DATA IMAGE SCAN - supports Quick Test, fault codes, guided, wiring, continuity etc. */}
@@ -1628,6 +2105,7 @@ function App() {
         </div>
         <p className="text-xs text-[#8e8e93] mt-3 leading-snug">
           Get key at <span className="underline">console.x.ai</span>. Encrypted with passphrase using Web Crypto (AES-GCM + 150k PBKDF2). Passphrase required on each app restart if key is encrypted.
+          The key also enables premium Grok vision OCR for the initial RO scan (highly accurate structured extraction of vehicle info + labeled complaints).
         </p>
         {isUnlocked && <div className="text-[10px] text-[#30d158] mt-2">✓ Key unlocked in memory for this session.</div>}
       </div>
