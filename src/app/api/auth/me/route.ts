@@ -4,7 +4,7 @@ import { handleRouteError } from '@/lib/errors';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 
 export async function GET(request: Request) {
-  const rateLimited = checkRateLimit(request, 'auth.me', RATE_LIMITS.default);
+  const rateLimited = await checkRateLimit(request, 'auth.me', RATE_LIMITS.default);
   if (rateLimited) return rateLimited;
 
   try {

@@ -5,7 +5,7 @@ import { handleRouteError } from '@/lib/errors';
 import { checkRateLimit, getRequestIp, RATE_LIMITS } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
-  const rateLimited = checkRateLimit(request, 'auth.logout', RATE_LIMITS.default);
+  const rateLimited = await checkRateLimit(request, 'auth.logout', RATE_LIMITS.default);
   if (rateLimited) return rateLimited;
 
   try {

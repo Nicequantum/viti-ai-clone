@@ -5,7 +5,7 @@ interface RateLimitEntry {
   resetAt: number;
 }
 
-const store = new Map<string, RateLimitEntry>();
+const memoryStore = new Map<string, RateLimitEntry>();
 
 export interface RateLimitConfig {
   limit: number;
@@ -25,18 +25,12 @@ function getClientIp(request: Request): string {
   return request.headers.get('x-real-ip') || 'unknown';
 }
 
-export function checkRateLimit(
-  request: Request,
-  routeKey: string,
-  config: RateLimitConfig = RATE_LIMITS.default
-): Response | null {
-  const ip = getClientIp(request);
-  const key = `${routeKey}:${ip}`;
+function checkMemoryRateLimit(key: string, config: RateLimitConfig): Response | null {
   const now = Date.now();
-  const entry = store.get(key);
+  const entry = memoryStore.get(key);
 
   if (!entry || now >= entry.resetAt) {
-    store.set(key, { count: 1, resetAt: now + config.windowMs });
+    memoryStore.set(key, { count: 1, resetAt: now + config.windowMs });
     return null;
   }
 
@@ -46,6 +40,44 @@ export function checkRateLimit(
 
   entry.count += 1;
   return null;
+}
+
+async function checkKvRateLimit(key: string, config: RateLimitConfig): Promise<Response | null> {
+  const { kv } = await import('@vercel/kv');
+  const count = await kv.incr(key);
+
+  if (count === 1) {
+    await kv.expire(key, Math.max(1, Math.ceil(config.windowMs / 1000)));
+  }
+
+  if (count > config.limit) {
+    return apiError(RATE_LIMIT_ERROR, 429);
+  }
+
+  return null;
+}
+
+function isKvConfigured(): boolean {
+  return Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+}
+
+export async function checkRateLimit(
+  request: Request,
+  routeKey: string,
+  config: RateLimitConfig = RATE_LIMITS.default
+): Promise<Response | null> {
+  const ip = getClientIp(request);
+  const key = `ratelimit:${routeKey}:${ip}`;
+
+  if (isKvConfigured()) {
+    try {
+      return await checkKvRateLimit(key, config);
+    } catch (error) {
+      console.error('[rate-limit] KV error, falling back to memory', error);
+    }
+  }
+
+  return checkMemoryRateLimit(key, config);
 }
 
 export function getRequestIp(request: Request): string {

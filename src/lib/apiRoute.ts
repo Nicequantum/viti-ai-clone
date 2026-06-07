@@ -15,13 +15,13 @@ export async function withAuth<T>(
   request: Request,
   handler: (session: Session) => Promise<T>,
   options: RouteOptions = {}
-): Promise<NextResponse> {
-  const rateLimited = checkRateLimit(
+): Promise<NextResponse | Response> {
+  const rateLimited = await checkRateLimit(
     request,
     options.rateLimitKey || 'api',
     options.rateLimit || RATE_LIMITS.default
   );
-  if (rateLimited) return rateLimited as NextResponse;
+  if (rateLimited) return rateLimited;
 
   const session = await getSession();
   if (!session) {
@@ -34,7 +34,10 @@ export async function withAuth<T>(
 
   try {
     const result = await handler(session);
-    return result instanceof NextResponse ? result : NextResponse.json(result);
+    if (result instanceof NextResponse || result instanceof Response) {
+      return result;
+    }
+    return NextResponse.json(result);
   } catch (error) {
     return handleRouteError(error, options.rateLimitKey || 'api');
   }
@@ -44,17 +47,20 @@ export async function withPublicRoute<T>(
   request: Request,
   handler: () => Promise<T>,
   options: RouteOptions = {}
-): Promise<NextResponse> {
-  const rateLimited = checkRateLimit(
+): Promise<NextResponse | Response> {
+  const rateLimited = await checkRateLimit(
     request,
     options.rateLimitKey || 'public',
     options.rateLimit || RATE_LIMITS.default
   );
-  if (rateLimited) return rateLimited as NextResponse;
+  if (rateLimited) return rateLimited;
 
   try {
     const result = await handler();
-    return result instanceof NextResponse ? result : NextResponse.json(result);
+    if (result instanceof NextResponse || result instanceof Response) {
+      return result;
+    }
+    return NextResponse.json(result);
   } catch (error) {
     return handleRouteError(error, options.rateLimitKey || 'public');
   }

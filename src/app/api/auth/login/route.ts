@@ -6,7 +6,7 @@ import { checkRateLimit, getRequestIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { loginSchema, parseBody } from '@/lib/validation';
 
 export async function POST(request: Request) {
-  const rateLimited = checkRateLimit(request, 'auth.login', RATE_LIMITS.auth);
+  const rateLimited = await checkRateLimit(request, 'auth.login', RATE_LIMITS.auth);
   if (rateLimited) return rateLimited;
 
   try {
