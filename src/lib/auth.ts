@@ -110,9 +110,27 @@ async function resolveSessionPayload(tokenPayload: SessionPayload): Promise<Sess
   };
 }
 
-export async function getSession(): Promise<SessionPayload | null> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE)?.value;
+function readSessionTokenFromRequest(request?: Request): string | undefined {
+  if (!request) return undefined;
+  const cookieHeader = request.headers.get('cookie');
+  if (!cookieHeader) return undefined;
+  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`));
+  return match?.[1];
+}
+
+export async function getSession(request?: Request): Promise<SessionPayload | null> {
+  let token: string | undefined;
+
+  try {
+    const cookieStore = await cookies();
+    token = cookieStore.get(SESSION_COOKIE)?.value;
+  } catch {
+    token = readSessionTokenFromRequest(request);
+  }
+
+  if (!token) {
+    token = readSessionTokenFromRequest(request);
+  }
   if (!token) return null;
 
   const tokenPayload = await verifySessionToken(token);

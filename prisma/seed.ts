@@ -3,10 +3,17 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-const MANAGER_PASSWORD = 'REDACTED_USE_ADMIN_SEED_PASSWORD_ENV';
 const TECH_PASSWORD = 'changeme123';
 
 async function main() {
+  const managerPassword = process.env.ADMIN_SEED_PASSWORD;
+  if (!managerPassword || managerPassword.length < 8) {
+    throw new Error(
+      'ADMIN_SEED_PASSWORD must be set (min 8 characters) before running db:seed.\n' +
+        'Example: ADMIN_SEED_PASSWORD="your-secure-password" npm run db:seed'
+    );
+  }
+
   const dealership = await prisma.dealership.upsert({
     where: { id: 'seed-dealership' },
     update: {},
@@ -16,7 +23,7 @@ async function main() {
     },
   });
 
-  const managerPasswordHash = await bcrypt.hash(MANAGER_PASSWORD, 12);
+  const managerPasswordHash = await bcrypt.hash(managerPassword, 12);
   const techPasswordHash = await bcrypt.hash(TECH_PASSWORD, 12);
 
   await prisma.technician.upsert({
@@ -50,8 +57,8 @@ async function main() {
   });
 
   console.log('Seed complete.');
-  console.log('  admin@dealership.com (manager) — password updated');
-  console.log('  tech@dealership.com / changeme123 (technician)');
+  console.log('  admin@dealership.com (manager) — password from ADMIN_SEED_PASSWORD');
+  console.log('  tech@dealership.com (technician) — default demo password still in use; rotate before production');
 }
 
 main()

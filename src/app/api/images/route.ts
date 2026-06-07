@@ -42,7 +42,7 @@ export async function GET(request: Request) {
   const rateLimited = await checkRateLimit(request, 'images.get');
   if (rateLimited) return rateLimited;
 
-  const session = await getSession();
+  const session = await getSession(request);
   if (!session) {
     return apiError(UNAUTHORIZED_ERROR, 401);
   }

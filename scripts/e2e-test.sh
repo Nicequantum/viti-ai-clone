@@ -43,7 +43,8 @@ check_http() {
 rm -f "$COOKIE_JAR"
 
 log "1. Manager login"
-RESP=$(api POST /api/auth/login '{"email":"admin@dealership.com","password":"REDACTED_USE_ADMIN_SEED_PASSWORD_ENV"}')
+: "${ADMIN_SEED_PASSWORD:?Set ADMIN_SEED_PASSWORD before running e2e tests}"
+RESP=$(api POST /api/auth/login "{\"email\":\"admin@dealership.com\",\"password\":\"${ADMIN_SEED_PASSWORD}\"}")
 BODY=$(check_http "$RESP" 200 "Manager login")
 echo "$BODY" | grep -q '"role":"manager"' && pass "Manager role in session" || fail "Manager role missing"
 

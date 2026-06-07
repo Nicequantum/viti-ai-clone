@@ -91,24 +91,44 @@ export async function checkGrokApi(): Promise<DependencyCheck> {
   try {
     const { latencyMs } = await timed(async () => {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
+      const timeout = setTimeout(() => controller.abort(), 12_000);
       try {
-        const response = await fetch('https://api.x.ai/v1/models', {
-          headers: { Authorization: `Bearer ${key}` },
+        const response = await fetch('https://api.x.ai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${key}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'grok-3',
+            messages: [{ role: 'user', content: 'Reply with exactly: ok' }],
+            max_tokens: 4,
+            temperature: 0,
+          }),
           signal: controller.signal,
         });
+
         if (response.status === 401 || response.status === 403) {
           throw new Error(`API key rejected (HTTP ${response.status})`);
         }
-        if (!response.ok && response.status !== 404) {
-          throw new Error(`Unexpected response (HTTP ${response.status})`);
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Chat completions failed (HTTP ${response.status}): ${errText.slice(0, 120)}`);
+        }
+
+        const payload = (await response.json()) as {
+          choices?: Array<{ message?: { content?: string } }>;
+        };
+        const content = payload.choices?.[0]?.message?.content?.trim();
+        if (!content) {
+          throw new Error('Grok chat completions returned an empty response');
         }
         return true;
       } finally {
         clearTimeout(timeout);
       }
     });
-    return { status: 'ok', latencyMs };
+    return { status: 'ok', latencyMs, detail: 'chat/completions reachable (grok-3)' };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Grok API unreachable';
     if (message.includes('aborted')) {

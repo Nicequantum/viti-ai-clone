@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   if (rateLimited) return rateLimited;
 
   try {
-    const session = await getSession();
+    const session = await getSession(request);
     return NextResponse.json({ session });
   } catch (error) {
     return handleRouteError(error, 'auth.me');

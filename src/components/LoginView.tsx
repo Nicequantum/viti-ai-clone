@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { FlaskConical } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AlertTriangle, FlaskConical } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface LoginViewProps {
@@ -9,10 +9,25 @@ interface LoginViewProps {
   demoMode?: boolean;
 }
 
+interface SecurityStatus {
+  usingDefaultSeedPasswords: boolean;
+  warnings: string[];
+}
+
 export function LoginView({ onLogin, demoMode = false }: LoginViewProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [securityStatus, setSecurityStatus] = useState<SecurityStatus | null>(null);
+
+  useEffect(() => {
+    fetch('/api/auth/security-status', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setSecurityStatus(data as SecurityStatus);
+      })
+      .catch(() => undefined);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +53,23 @@ export function LoginView({ onLogin, demoMode = false }: LoginViewProps) {
               <p className="text-[10px] text-[#8e8e93] mt-1 leading-relaxed">
                 Synthetic data only. Do not enter real customer information until xAI DPA is finalized and production
                 mode is enabled.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {securityStatus?.usingDefaultSeedPasswords && (
+          <div className="mb-4 ios-card p-3 border border-[#ff9f0a]/50 bg-[#ff9f0a]/10 flex items-start gap-2">
+            <AlertTriangle size={16} className="text-[#ff9f0a] mt-0.5 shrink-0" />
+            <div>
+              <p className="text-xs font-semibold text-[#ff9f0a]">Default Seed Passwords Detected</p>
+              <ul className="text-[10px] text-[#8e8e93] mt-1 leading-relaxed space-y-1 list-disc pl-4">
+                {securityStatus.warnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+              <p className="text-[10px] text-[#666] mt-2">
+                Rotate all seed account passwords in Settings before a dealership presentation or production use.
               </p>
             </div>
           </div>

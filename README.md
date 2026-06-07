@@ -64,6 +64,7 @@ cp .env.example .env
 | `GROK_API_KEY` | For AI | xAI key — server-side only |
 | `BLOB_READ_WRITE_TOKEN` | For uploads | Vercel Blob private storage |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Production | Vercel KV for distributed rate limiting |
+| `ADMIN_SEED_PASSWORD` | For seed | Manager password for `npm run db:seed` — **never commit** |
 | `DEMO_MODE` | Optional | `true` (default) enables Load Demo Data button |
 
 ### 3. Database setup (migrations)
@@ -72,7 +73,7 @@ cp .env.example .env
 
 ```bash
 npm run db:migrate:deploy
-npm run db:seed
+ADMIN_SEED_PASSWORD="your-secure-password" npm run db:seed
 ```
 
 **Existing database created with `db push`:**
@@ -96,10 +97,10 @@ Open [http://localhost:3000](http://localhost:3000)
 
 | Email | Password | Role |
 |-------|----------|------|
-| `admin@dealership.com` | Set via seed (secure) | Manager |
-| `tech@dealership.com` | `changeme123` | Technician |
+| `admin@dealership.com` | Value of `ADMIN_SEED_PASSWORD` at seed time | Manager |
+| `tech@dealership.com` | `changeme123` (demo default) | Technician |
 
-Re-run `npm run db:seed` to apply the manager password. Change the technician password before any shared deployment.
+Set `ADMIN_SEED_PASSWORD` in your environment before seeding. The login screen warns if default seed passwords are still active.
 
 ## Production Deployment (Vercel)
 
@@ -121,6 +122,23 @@ npm run db:seed
 
 7. Verify health: `GET /api/health` should return `"status": "ok"` or `"degraded"` (missing optional keys)
 
+## Pre-Demo Checklist (dealership ownership presentations)
+
+Complete this list **before** showing Benz Tech to Fixed Ops leadership:
+
+- [ ] **Environment configured** — `DATABASE_URL`, `SESSION_SECRET`, `ENCRYPTION_KEY`, `ADMIN_SEED_PASSWORD` set on host
+- [ ] **Database migrated** — `npm run db:migrate:deploy` completed without errors
+- [ ] **Accounts seeded** — `ADMIN_SEED_PASSWORD="…" npm run db:seed` run once; manager password rotated if login shows default-password warning
+- [ ] **Technician password rotated** — change `tech@dealership.com` off `changeme123` via Settings (or confirm warning is acceptable for controlled pilot)
+- [ ] **Health check green** — `GET /api/health` returns `"status": "ok"` or documented `"degraded"` (Grok/blob optional for static demo)
+- [ ] **Demo data loaded** — sign in as manager → **Load Demo Data** → verify 3 `DEMO-*` repair orders appear
+- [ ] **Audit chain valid** — Audit Log shows hash-chain integrity **VALID**
+- [ ] **No real customer PII** — use only synthetic ROs and sample screenshots for the presentation
+- [ ] **xAI DPA framing ready** — explain that AI features are pilot-only until business DPA is signed
+- [ ] **CI passing** — GitHub Actions workflow green on `v2.3-dealership`
+
+**Suggested demo script (15 minutes):** Manager login → Dashboard metrics → Open demo RO with pre-written story → Show line-level story generation concept → Audit log + CSV export → User admin → Settings security panel.
+
 ## Demo Workflow (for ownership presentations)
 
 1. Sign in as **manager** (`admin@dealership.com`)
@@ -135,7 +153,8 @@ For live scanning demos, configure `GROK_API_KEY` and `BLOB_READ_WRITE_TOKEN`.
 
 | Endpoint | Auth | Description |
 |----------|------|-------------|
-| `GET /api/health` | Public | Service health and dependency checks |
+| `GET /api/health` | Public | Service health and live dependency probes |
+| `GET /api/auth/security-status` | Public | Detects if default seed passwords are still in use |
 | `POST /api/demo/seed` | Session | Load synthetic demo repair orders |
 | `GET /api/dashboard/summary` | Session | Manager/tech dashboard metrics |
 | `GET /api/audit-logs/summary` | Manager | Audit stats + chain verification |

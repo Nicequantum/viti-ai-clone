@@ -12,7 +12,7 @@ import { logger } from '@/lib/logger';
 import { checkRateLimit, getRequestIp, RATE_LIMITS } from '@/lib/rate-limit';
 
 async function performLogout(request: Request) {
-  const session = await getSession();
+  const session = await getSession(request);
 
   if (session) {
     await destroySession(session.technicianId);
