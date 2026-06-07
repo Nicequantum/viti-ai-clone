@@ -61,8 +61,8 @@ export async function generateWarrantyStory(
   return story || 'No story generated.';
 }
 
-export async function extractROFromImages(imageUrls: string[]) {
-  const imageContents = imageUrls.map((url) => ({ type: 'image_url', image_url: { url } }));
+export async function extractROFromImages(imageDataUrls: string[]) {
+  const imageContents = imageDataUrls.map((url) => ({ type: 'image_url', image_url: { url } }));
   const extractedText = await grokChat(
     [
       {
