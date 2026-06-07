@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [v2.3-dealership, main]
+  pull_request:
+    branches: [v2.3-dealership, main]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: benz
+          POSTGRES_PASSWORD: benztest
+          POSTGRES_DB: benz_tech
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U benz -d benz_tech"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://benz:benztest@localhost:5432/benz_tech
+      SESSION_SECRET: ci-session-secret-minimum-32-characters-long
+      ENCRYPTION_KEY: e83834bdbca1cc4d680bde14cb4ad9a29483e426e0a29e7d23c9350551e1987b
+      ADMIN_SEED_PASSWORD: CI-Admin-Seed-Password-For-Tests-Only!
+      DEMO_MODE: 'true'
+      GROK_API_KEY: ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply database migrations
+        run: npm run db:migrate:deploy
+
+      - name: Seed database
+        run: npm run db:seed
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build application
+        run: npm run build
