@@ -1,10 +1,15 @@
 import { verifyPassword } from './auth';
 import { prisma } from './db';
 
-/** Known default password used for the technician seed account. */
+/** Known default password used for the technician seed account when TECH_SEED_PASSWORD is unset. */
 export const DEFAULT_TECH_SEED_PASSWORD = 'changeme123';
 
-const SEED_ACCOUNTS = ['admin@dealership.com', 'tech@dealership.com'] as const;
+function getSeedAccountEmails(): { managerEmail: string; techEmail: string } {
+  return {
+    managerEmail: process.env.ADMIN_SEED_EMAIL?.trim() || 'admin@dealership.com',
+    techEmail: process.env.TECH_SEED_EMAIL?.trim() || 'tech@dealership.com',
+  };
+}
 
 export interface SeedSecurityStatus {
   usingDefaultSeedPasswords: boolean;
@@ -13,8 +18,11 @@ export interface SeedSecurityStatus {
 }
 
 export async function checkSeedPasswordSecurity(): Promise<SeedSecurityStatus> {
+  const { managerEmail, techEmail } = getSeedAccountEmails();
+  const techSeedPassword = process.env.TECH_SEED_PASSWORD?.trim() || DEFAULT_TECH_SEED_PASSWORD;
+
   const accounts = await prisma.technician.findMany({
-    where: { email: { in: [...SEED_ACCOUNTS] } },
+    where: { email: { in: [managerEmail, techEmail] } },
     select: { email: true, passwordHash: true, role: true },
   });
 
@@ -22,15 +30,19 @@ export async function checkSeedPasswordSecurity(): Promise<SeedSecurityStatus> {
   const warnings: string[] = [];
 
   for (const account of accounts) {
-    if (account.email === 'tech@dealership.com') {
-      const isDefault = await verifyPassword(DEFAULT_TECH_SEED_PASSWORD, account.passwordHash);
-      if (isDefault) {
+    if (account.email === techEmail) {
+      const matchesTechSeed = await verifyPassword(techSeedPassword, account.passwordHash);
+      if (matchesTechSeed) {
         accountsUsingDefaults.push(account.email);
-        warnings.push('Technician demo account still uses the default seed password (changeme123).');
+        warnings.push(
+          techSeedPassword === DEFAULT_TECH_SEED_PASSWORD
+            ? 'Technician seed account still uses the default demo password (changeme123).'
+            : 'Technician account password matches TECH_SEED_PASSWORD — change it before a public demo or production use.'
+        );
       }
     }
 
-    if (account.email === 'admin@dealership.com') {
+    if (account.email === managerEmail) {
       const adminSeedPassword = process.env.ADMIN_SEED_PASSWORD;
       if (adminSeedPassword) {
         const matchesSeed = await verifyPassword(adminSeedPassword, account.passwordHash);

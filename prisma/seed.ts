@@ -3,16 +3,21 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-const TECH_PASSWORD = 'changeme123';
-
-async function main() {
-  const managerPassword = process.env.ADMIN_SEED_PASSWORD;
-  if (!managerPassword || managerPassword.length < 8) {
+function requireEnv(name: string, minLength = 1): string {
+  const value = process.env[name]?.trim();
+  if (!value || value.length < minLength) {
     throw new Error(
-      'ADMIN_SEED_PASSWORD must be set (min 8 characters) before running db:seed.\n' +
-        'Example: ADMIN_SEED_PASSWORD="your-secure-password" npm run db:seed'
+      `${name} must be set${minLength > 1 ? ` (min ${minLength} characters)` : ''} before running db:seed.`
     );
   }
+  return value;
+}
+
+async function main() {
+  const managerEmail = process.env.ADMIN_SEED_EMAIL?.trim() || 'admin@dealership.com';
+  const managerPassword = requireEnv('ADMIN_SEED_PASSWORD', 8);
+  const techEmail = process.env.TECH_SEED_EMAIL?.trim() || 'tech@dealership.com';
+  const techPassword = process.env.TECH_SEED_PASSWORD?.trim() || 'changeme123';
 
   const dealership = await prisma.dealership.upsert({
     where: { id: 'seed-dealership' },
@@ -24,13 +29,13 @@ async function main() {
   });
 
   const managerPasswordHash = await bcrypt.hash(managerPassword, 12);
-  const techPasswordHash = await bcrypt.hash(TECH_PASSWORD, 12);
+  const techPasswordHash = await bcrypt.hash(techPassword, 12);
 
   await prisma.technician.upsert({
-    where: { email: 'admin@dealership.com' },
-    update: { passwordHash: managerPasswordHash },
+    where: { email: managerEmail },
+    update: { passwordHash: managerPasswordHash, role: 'manager', isActive: true, dealershipId: dealership.id },
     create: {
-      email: 'admin@dealership.com',
+      email: managerEmail,
       name: 'Service Manager',
       passwordHash: managerPasswordHash,
       role: 'manager',
@@ -42,10 +47,10 @@ async function main() {
   });
 
   await prisma.technician.upsert({
-    where: { email: 'tech@dealership.com' },
-    update: {},
+    where: { email: techEmail },
+    update: { passwordHash: techPasswordHash, role: 'technician', isActive: true, dealershipId: dealership.id },
     create: {
-      email: 'tech@dealership.com',
+      email: techEmail,
       name: 'Alex Technician',
       passwordHash: techPasswordHash,
       role: 'technician',
@@ -57,8 +62,8 @@ async function main() {
   });
 
   console.log('Seed complete.');
-  console.log('  admin@dealership.com (manager) — password from ADMIN_SEED_PASSWORD');
-  console.log('  tech@dealership.com (technician) — default demo password still in use; rotate before production');
+  console.log(`  ${managerEmail} (manager) — password from ADMIN_SEED_PASSWORD`);
+  console.log(`  ${techEmail} (technician) — password from TECH_SEED_PASSWORD or demo default`);
 }
 
 main()
