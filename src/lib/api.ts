@@ -1,4 +1,6 @@
 import type {
+  AdvisorDetail,
+  AdvisorListItem,
   AuditDashboardSummary,
   AuditLogEntry,
   DashboardSummary,
@@ -108,6 +110,10 @@ export const api = {
     formData.append('file', file);
     return apiUpload<{ pathname: string; url: string; name: string }>('/api/upload', formData);
   },
+
+  listAdvisors: () => apiFetch<{ advisors: AdvisorListItem[] }>('/api/advisors'),
+
+  getAdvisor: (id: string) => apiFetch<{ advisor: AdvisorDetail }>(`/api/advisors/${id}`),
 
   getAdvisorIntelligenceSummary: () =>
     apiFetch<{

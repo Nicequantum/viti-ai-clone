@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Sparkles,
   Users,
+  UserRound,
 } from 'lucide-react';
 import { DealershipBranding } from '@/components/DealershipBranding';
 import { ScanROSection } from '@/components/ScanROSection';
@@ -26,6 +27,7 @@ interface ManagerDashboardProps {
   onOpenRO: (ro: RepairOrder) => void;
   onOpenSettings: () => void;
   onOpenAuditLogs: () => void;
+  onOpenServiceAdvisors: () => void;
   pendingROImages: PendingImage[];
   onScanRO: () => void;
   onCancelScan: () => void;
@@ -67,6 +69,7 @@ export function ManagerDashboard({
   onOpenRO,
   onOpenSettings,
   onOpenAuditLogs,
+  onOpenServiceAdvisors,
   pendingROImages,
   onScanRO,
   onCancelScan,
@@ -154,9 +157,20 @@ export function ManagerDashboard({
                 ? ` ${chain.legacyEntries} legacy entr${chain.legacyEntries === 1 ? 'y' : 'ies'} pre-date the hash chain.`
                 : ''}
             </p>
-            <button onClick={onOpenAuditLogs} className="secondary-btn w-full h-10 text-xs font-semibold flex items-center justify-center gap-2">
-              <ScrollText size={14} /> VIEW AUDIT LOG & EXPORT
-            </button>
+            <div className="grid grid-cols-1 gap-2">
+              <button
+                onClick={onOpenServiceAdvisors}
+                className="secondary-btn w-full h-10 text-xs font-semibold flex items-center justify-center gap-2"
+              >
+                <UserRound size={14} /> SERVICE ADVISORS
+              </button>
+              <button
+                onClick={onOpenAuditLogs}
+                className="secondary-btn w-full h-10 text-xs font-semibold flex items-center justify-center gap-2"
+              >
+                <ScrollText size={14} /> VIEW AUDIT LOG & EXPORT
+              </button>
+            </div>
           </div>
 
           {summary.recentRepairOrders.length > 0 && (

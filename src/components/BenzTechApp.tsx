@@ -9,6 +9,7 @@ import { LoadingScreen } from '@/components/LoadingScreen';
 import { ManagerDashboard } from '@/components/ManagerDashboard';
 import { ROView } from '@/components/ROView';
 import { AuditLogView } from '@/components/AuditLogView';
+import { ServiceAdvisorsView } from '@/components/ServiceAdvisorsView';
 import { SettingsView } from '@/components/SettingsView';
 import { useOcrProgress } from '@/hooks/useOcrProgress';
 import { useRepairOrders } from '@/hooks/useRepairOrders';
@@ -103,7 +104,7 @@ export function BenzTechApp() {
 
   return (
     <div className="app-container">
-      {ro.view !== 'home' && ro.view !== 'settings' && ro.view !== 'audit' && (
+      {ro.view !== 'home' && ro.view !== 'settings' && ro.view !== 'audit' && ro.view !== 'advisors' && (
         <AppHeader technicianName={session.name} onOpenSettings={goToSettings} />
       )}
 
@@ -117,6 +118,7 @@ export function BenzTechApp() {
           onOpenRO={ro.openRO}
           onOpenSettings={goToSettings}
           onOpenAuditLogs={() => ro.setView('audit')}
+          onOpenServiceAdvisors={() => ro.setView('advisors')}
           pendingROImages={ro.pendingROImages}
           onScanRO={ro.scanRO}
           onCancelScan={ro.cancelScan}
@@ -198,11 +200,16 @@ export function BenzTechApp() {
           onBack={() => ro.setView(ro.currentRO ? 'ro' : 'home')}
           onLogout={logout}
           onOpenAuditLogs={isManager ? () => ro.setView('audit') : undefined}
+          onOpenServiceAdvisors={isManager ? () => ro.setView('advisors') : undefined}
         />
       )}
 
       {ro.view === 'audit' && (
         <AuditLogView session={session} onBack={() => ro.setView(isManager ? 'home' : 'settings')} />
+      )}
+
+      {ro.view === 'advisors' && isManager && (
+        <ServiceAdvisorsView onBack={() => ro.setView('home')} />
       )}
     </div>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, Building2, KeyRound, LogOut, ScrollText, Shield, User, UserPlus, Users } from 'lucide-react';
+import { ArrowLeft, Building2, KeyRound, LogOut, ScrollText, Shield, User, UserPlus, UserRound, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, type TechnicianUser } from '@/lib/api';
 import type { TechnicianSession } from '@/types';
@@ -13,9 +13,10 @@ interface SettingsViewProps {
   onBack: () => void;
   onLogout: () => Promise<void>;
   onOpenAuditLogs?: () => void;
+  onOpenServiceAdvisors?: () => void;
 }
 
-export function SettingsView({ session, onBack, onLogout, onOpenAuditLogs }: SettingsViewProps) {
+export function SettingsView({ session, onBack, onLogout, onOpenAuditLogs, onOpenServiceAdvisors }: SettingsViewProps) {
   const [users, setUsers] = useState<TechnicianUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -187,6 +188,22 @@ export function SettingsView({ session, onBack, onLogout, onOpenAuditLogs }: Set
           </li>
         </ul>
       </div>
+
+      {isManager && onOpenServiceAdvisors && (
+        <button
+          onClick={onOpenServiceAdvisors}
+          className="ios-card p-5 mb-4 w-full flex items-center justify-between text-left"
+        >
+          <div className="flex items-center gap-2">
+            <UserRound size={16} className="text-[#0a84ff]" />
+            <div>
+              <div className="font-semibold text-sm">Service Advisors</div>
+              <div className="text-[10px] text-[#8e8e93]">Advisor Intelligence profiles & complaint patterns</div>
+            </div>
+          </div>
+          <span className="text-[#0a84ff] text-xs">OPEN</span>
+        </button>
+      )}
 
       {isManager && onOpenAuditLogs && (
         <button

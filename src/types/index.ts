@@ -66,7 +66,57 @@ export interface RepairOrder {
   technicianName?: string;
 }
 
-export type AppView = 'home' | 'ro' | 'line' | 'settings' | 'audit';
+export type AppView = 'home' | 'ro' | 'line' | 'settings' | 'audit' | 'advisors';
+
+export interface AdvisorListItem {
+  id: string;
+  displayName: string;
+  roCount: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  observationCount: number;
+  profileUpdatedAt: string | null;
+  typicallyAllCaps: boolean;
+  commonPhraseCount: number;
+}
+
+export interface AdvisorProfileData {
+  formatting: {
+    usesLetterLabels: boolean;
+    labelStyle: string;
+    typicallyAllCaps: boolean;
+    avgComplaintsPerRo: number;
+    avgComplaintLength: number;
+  };
+  abbreviations: Record<string, string>;
+  commonPhrases: Array<{ text: string; count: number }>;
+  vehicleAffinities: Record<string, number>;
+  complaintCategories: Record<string, unknown>;
+  extractionHints: string[];
+}
+
+export interface AdvisorDetail {
+  id: string;
+  displayName: string;
+  roCount: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  profile: {
+    observationCount: number;
+    profileVersion: number;
+    lastComputedAt: string | null;
+    profileData: AdvisorProfileData | null;
+  } | null;
+  recentObservations: Array<{
+    id: string;
+    lineLabel: string | null;
+    roNumber: string;
+    vehicleFamily: string | null;
+    vehicle: string;
+    complaint: string;
+    observedAt: string;
+  }>;
+}
 
 export interface StructuredROExtraction {
   vehicle: VehicleInfo;

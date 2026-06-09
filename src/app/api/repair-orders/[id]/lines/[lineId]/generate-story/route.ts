@@ -1,5 +1,9 @@
 import { writeAuditLog } from '@/lib/audit';
 import { withAuth } from '@/lib/apiRoute';
+import {
+  formatAdvisorContextForPrompt,
+  loadAdvisorPromptContextForRepairOrder,
+} from '@/lib/advisorIntelligence';
 import { prisma } from '@/lib/db';
 import { generateWarrantyStory } from '@/lib/grok';
 import { dbToRepairOrder } from '@/lib/roMapper';
@@ -54,7 +58,10 @@ export async function POST(
             .join('\n---\n');
       }
 
-      const warrantyStory = await generateWarrantyStory(mapped, line, historyContext);
+      const advisorCtx = await loadAdvisorPromptContextForRepairOrder(id);
+      const advisorContext = advisorCtx ? formatAdvisorContextForPrompt(advisorCtx) : '';
+
+      const warrantyStory = await generateWarrantyStory(mapped, line, historyContext, advisorContext);
 
       await prisma.repairLine.update({
         where: { id: lineId },
@@ -67,7 +74,13 @@ export async function POST(
         technicianId: session.technicianId,
         entityType: 'repairLine',
         entityId: lineId,
-        metadata: { repairOrderId: id, lineNumber: line.lineNumber },
+        metadata: {
+          repairOrderId: id,
+          lineNumber: line.lineNumber,
+          advisorIntelligenceUsed: Boolean(advisorCtx),
+          serviceAdvisorId: advisorCtx?.serviceAdvisorId ?? null,
+          serviceAdvisorName: advisorCtx?.displayName ?? null,
+        },
         ipAddress: getRequestIp(request),
       });
 

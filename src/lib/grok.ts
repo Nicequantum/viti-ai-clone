@@ -48,9 +48,10 @@ async function grokChat(
 export async function generateWarrantyStory(
   ro: RepairOrder,
   line: RepairLine,
-  historyContext = ''
+  historyContext = '',
+  advisorContext = ''
 ): Promise<string> {
-  const userMessage = buildWarrantyStoryUserMessage(ro, line, historyContext);
+  const userMessage = buildWarrantyStoryUserMessage(ro, line, historyContext, undefined, advisorContext);
   const story = await grokChat(
     [
       { role: 'system', content: SYSTEM_PROMPT },

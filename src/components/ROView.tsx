@@ -44,6 +44,11 @@ export function ROView({
         <div>
           <div className="text-xl font-semibold">{ro.roNumber}</div>
           <div className="text-sm text-[#8e8e93]">Repair Order • Pre-populated from scan or manual entry</div>
+          {(ro.serviceAdvisor?.displayName || ro.serviceAdvisorName) && (
+            <div className="text-[10px] text-[#0a84ff] mt-1">
+              Service Advisor: {ro.serviceAdvisor?.displayName || ro.serviceAdvisorName}
+            </div>
+          )}
         </div>
         <button onClick={onDone} className="text-[#0a84ff] text-sm">
           Done

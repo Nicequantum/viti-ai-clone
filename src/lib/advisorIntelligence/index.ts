@@ -1,4 +1,11 @@
 export {
+  formatAdvisorContextForPrompt,
+  loadAdvisorPromptContext,
+  loadAdvisorPromptContextForRepairOrder,
+  type AdvisorProfileData,
+  type AdvisorPromptContext,
+} from './buildPromptContext';
+export {
   captureAdvisorIntelligence,
   type AdvisorExtractionSource,
   type CaptureAdvisorIntelligenceInput,

@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Camera, Copy, Download, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Camera, Copy, Download, RefreshCw, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import type { RepairLine, RepairOrder } from '@/types';
 import { WARRANTY_STORY_MAX_CHARS, WARRANTY_STORY_WARN_CHARS } from '@/types';
@@ -44,6 +44,7 @@ export function LineView({
   const mileageStr = ro.vehicle.mileageIn ? `${ro.vehicle.mileageIn} mi` : '';
   const suggestions = getSuggestions(ro);
   const storyLen = line.warrantyStory?.length ?? 0;
+  const advisorName = ro.serviceAdvisor?.displayName || ro.serviceAdvisorName;
 
   const handleCopy = async () => {
     if (!line.warrantyStory) return;
@@ -172,6 +173,18 @@ export function LineView({
             Reference only — not used as performed work unless you document actual results in notes or OCR.
           </div>
         </div>
+
+        {advisorName && (
+          <div className="ios-card p-3 mb-2 border border-[#0a84ff]/20">
+            <div className="flex items-center gap-2 text-[#0a84ff] text-xs font-medium">
+              <Sparkles size={14} />
+              Advisor Intelligence active
+            </div>
+            <p className="text-[10px] text-[#8e8e93] mt-1 leading-relaxed">
+              Story generation will match {advisorName}&apos;s complaint phrasing style for this RO.
+            </p>
+          </div>
+        )}
 
         <div>
           <button onClick={onGenerateStory} disabled={isGenerating} className="primary-btn w-full h-14 text-base disabled:opacity-60">

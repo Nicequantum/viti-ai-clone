@@ -52,7 +52,8 @@ export function buildWarrantyStoryUserMessage(
   ro: RepairOrder,
   line: RepairLine,
   historyContext: string = '',
-  templateIndex?: number
+  templateIndex?: number,
+  advisorContext: string = ''
 ): string {
   const vehicleInfo = `${ro.vehicle.year} ${ro.vehicle.make} ${ro.vehicle.model} | VIN: ${ro.vehicle.vin} | Miles: ${ro.vehicle.mileageIn}${ro.vehicle.mileageOut ? ` → ${ro.vehicle.mileageOut}` : ''}`
     .replace(/\s+/g, ' ')
@@ -103,11 +104,12 @@ ${xentryText}
 ${rawXentryOcr}
 ${roRawXentryOcr}
 ${historyContext}
-
+${advisorContext ? `\n\nADVISOR INTELLIGENCE (style reference for this RO's service advisor):\n${advisorContext}\n` : ''}
 AUDIT-SAFE REQUIREMENTS:
 - Use ONLY the data above. Never invent numbers, codes, test results, or procedures.
 - Structure the story with the 3 C's (Customer Complaint/Concern, Cause, Correction).
 - Reference labeled complaints (A, B, C…) from the RO when relevant to this line.
+- If Advisor Intelligence is provided above, mirror that advisor's complaint phrasing style in the Customer Complaint section only.
 - If battery charger, Quick Test, test drive, verification drive, or specific measurements are NOT in the notes/OCR above, use [NOT DOCUMENTED] or [NOT PROVIDED] — do NOT fabricate them.
 - Smart-default or common-issue text in technician notes (if present) is reference only — never state it as performed work unless confirmed in diagnostic OCR or explicit technician findings.
 - For natural variety, follow this template style while staying strictly factual: ${selectedTemplate}
