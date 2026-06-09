@@ -1,12 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AlertTriangle, FlaskConical } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface LoginViewProps {
   onLogin: (email: string, password: string) => Promise<unknown>;
-  demoMode?: boolean;
 }
 
 interface SecurityStatus {
@@ -14,7 +13,7 @@ interface SecurityStatus {
   warnings: string[];
 }
 
-export function LoginView({ onLogin, demoMode = false }: LoginViewProps) {
+export function LoginView({ onLogin }: LoginViewProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -45,19 +44,6 @@ export function LoginView({ onLogin, demoMode = false }: LoginViewProps) {
   return (
     <div className="login-shell">
       <div className="w-full max-w-sm">
-        {demoMode && (
-          <div className="mb-4 ios-card p-3 border border-[#0a84ff]/40 bg-[#0a84ff]/10 flex items-start gap-2">
-            <FlaskConical size={16} className="text-[#0a84ff] mt-0.5 shrink-0" />
-            <div>
-              <p className="text-xs font-semibold text-[#0a84ff]">Demo / Pilot Mode</p>
-              <p className="text-[10px] text-[#8e8e93] mt-1 leading-relaxed">
-                Synthetic data only. Do not enter real customer information until xAI DPA is finalized and production
-                mode is enabled.
-              </p>
-            </div>
-          </div>
-        )}
-
         {securityStatus?.usingDefaultSeedPasswords && (
           <div className="mb-4 ios-card p-3 border border-[#ff9f0a]/50 bg-[#ff9f0a]/10 flex items-start gap-2">
             <AlertTriangle size={16} className="text-[#ff9f0a] mt-0.5 shrink-0" />
@@ -69,7 +55,7 @@ export function LoginView({ onLogin, demoMode = false }: LoginViewProps) {
                 ))}
               </ul>
               <p className="text-[10px] text-[#666] mt-2">
-                Rotate all seed account passwords in Settings before a dealership presentation or production use.
+                Rotate all seed account passwords in Settings before production use.
               </p>
             </div>
           </div>
@@ -111,10 +97,7 @@ export function LoginView({ onLogin, demoMode = false }: LoginViewProps) {
           </button>
         </form>
 
-        <p className="text-center text-[10px] text-[#666] mt-6 leading-relaxed px-4">
-          Authorized dealership personnel only.
-          {demoMode ? ' Technician demo: tech@dealership.com' : ''}
-        </p>
+        <p className="text-center text-[10px] text-[#666] mt-6 leading-relaxed px-4">Authorized dealership personnel only.</p>
       </div>
     </div>
   );

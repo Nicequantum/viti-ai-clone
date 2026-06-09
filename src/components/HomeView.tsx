@@ -93,12 +93,7 @@ export function HomeView({
                 className="ios-card p-3 active:bg-[#252528] cursor-pointer flex justify-between items-center"
               >
                 <div>
-                  <div className="font-semibold text-sm flex items-center gap-2">
-                    {ro.roNumber}
-                    {ro.roNumber.startsWith('DEMO-') && (
-                      <span className="status-pill bg-[#0a84ff]/15 text-[#0a84ff]">DEMO</span>
-                    )}
-                  </div>
+                  <div className="font-semibold text-sm">{ro.roNumber}</div>
                   <div className="text-xs text-[#8e8e93]">
                     {[ro.vehicle.year, ro.vehicle.make, ro.vehicle.model].filter(Boolean).join(' ')} • {ro.repairLines.length} lines
                     {ro.technicianName ? ` • ${ro.technicianName}` : ''}

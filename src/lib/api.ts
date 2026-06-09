@@ -167,11 +167,6 @@ export const api = {
 
   getDashboardSummary: () => apiFetch<DashboardSummary>('/api/dashboard/summary'),
 
-  seedDemoData: () =>
-    apiFetch<{ createdCount: number; repairOrders: RepairOrder[]; message: string }>('/api/demo/seed', {
-      method: 'POST',
-    }),
-
   exportAuditLogsCsv: (params: {
     technicianId?: string;
     action?: string;

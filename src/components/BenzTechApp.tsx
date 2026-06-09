@@ -15,11 +15,7 @@ import { useRepairOrders } from '@/hooks/useRepairOrders';
 import { useSession } from '@/hooks/useSession';
 import { useState } from 'react';
 
-interface BenzTechAppProps {
-  demoMode?: boolean;
-}
-
-export function BenzTechApp({ demoMode = false }: BenzTechAppProps) {
+export function BenzTechApp() {
   const { session, loading: sessionLoading, login, logout, acceptConsent } = useSession();
   const ocr = useOcrProgress();
   const ro = useRepairOrders({
@@ -39,7 +35,7 @@ export function BenzTechApp({ demoMode = false }: BenzTechAppProps) {
   }
 
   if (!session) {
-    return <LoginView onLogin={login} demoMode={demoMode} />;
+    return <LoginView onLogin={login} />;
   }
 
   if (!session.consentAt) {
@@ -76,12 +72,7 @@ export function BenzTechApp({ demoMode = false }: BenzTechAppProps) {
             className="ios-card p-3 active:bg-[#252528] cursor-pointer flex justify-between items-center"
           >
             <div>
-              <div className="font-semibold text-sm flex items-center gap-2">
-                {item.roNumber}
-                {item.roNumber.startsWith('DEMO-') && (
-                  <span className="status-pill bg-[#0a84ff]/15 text-[#0a84ff]">DEMO</span>
-                )}
-              </div>
+              <div className="font-semibold text-sm">{item.roNumber}</div>
               <div className="text-xs text-[#8e8e93]">
                 {[item.vehicle.year, item.vehicle.make, item.vehicle.model].filter(Boolean).join(' ')} •{' '}
                 {item.repairLines.length} lines

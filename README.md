@@ -65,7 +65,6 @@ cp .env.example .env
 | `BLOB_READ_WRITE_TOKEN` | For uploads | Vercel Blob private storage |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Production | Vercel KV for distributed rate limiting |
 | `ADMIN_SEED_PASSWORD` | For seed | Manager password for `npm run db:seed` — **never commit** |
-| `DEMO_MODE` | Optional | `true` (default) enables Load Demo Data button |
 
 ### 3. Database setup (migrations)
 
@@ -93,12 +92,12 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
-**Demo accounts** (from seed):
+**Seed accounts** (from `npm run db:seed`):
 
 | Email | Password | Role |
 |-------|----------|------|
 | `admin@dealership.com` | Value of `ADMIN_SEED_PASSWORD` at seed time | Manager |
-| `tech@dealership.com` | `changeme123` (demo default) | Technician |
+| `tech@dealership.com` | Value of `TECH_SEED_PASSWORD` or `changeme123` | Technician |
 
 Set `ADMIN_SEED_PASSWORD` in your environment before seeding. The login screen warns if default seed passwords are still active.
 
@@ -122,32 +121,17 @@ npm run db:seed
 
 7. Verify health: `GET /api/health` should return `"status": "ok"` or `"degraded"` (missing optional keys)
 
-## Pre-Demo Checklist (dealership ownership presentations)
+## Pre-Production Checklist
 
-Complete this list **before** showing Benz Tech to Fixed Ops leadership:
+Complete this list before going live with real customer data:
 
 - [ ] **Environment configured** — `DATABASE_URL`, `SESSION_SECRET`, `ENCRYPTION_KEY`, `ADMIN_SEED_PASSWORD` set on host
 - [ ] **Database migrated** — `npm run db:migrate:deploy` completed without errors
-- [ ] **Accounts seeded** — `ADMIN_SEED_PASSWORD="…" npm run db:seed` run once; manager password rotated if login shows default-password warning
-- [ ] **Technician password rotated** — change `tech@dealership.com` off `changeme123` via Settings (or confirm warning is acceptable for controlled pilot)
-- [ ] **Health check green** — `GET /api/health` returns `"status": "ok"` or documented `"degraded"` (Grok/blob optional for static demo)
-- [ ] **Demo data loaded** — sign in as manager → **Load Demo Data** → verify 3 `DEMO-*` repair orders appear
+- [ ] **Accounts provisioned** — `ADMIN_SEED_PASSWORD="…" npm run db:seed` run once; all seed passwords rotated via Settings
+- [ ] **Health check green** — `GET /api/health` returns `"status": "ok"` (configure `GROK_API_KEY` and `BLOB_READ_WRITE_TOKEN` for scanning)
 - [ ] **Audit chain valid** — Audit Log shows hash-chain integrity **VALID**
-- [ ] **No real customer PII** — use only synthetic ROs and sample screenshots for the presentation
-- [ ] **xAI DPA framing ready** — explain that AI features are pilot-only until business DPA is signed
+- [ ] **xAI DPA executed** — business account and data processing agreement finalized before production PII
 - [ ] **CI passing** — GitHub Actions workflow green on `v2.3-dealership`
-
-**Suggested demo script (15 minutes):** Manager login → Dashboard metrics → Open demo RO with pre-written story → Show line-level story generation concept → Audit log + CSV export → User admin → Settings security panel.
-
-## Demo Workflow (for ownership presentations)
-
-1. Sign in as **manager** (`admin@dealership.com`)
-2. Tap **Load Demo Data** — creates 3 synthetic repair orders (no real customer PII)
-3. Open a demo RO → review vehicle, complaints, and pre-written warranty story
-4. Open **Audit Log** — show hash-chain integrity banner and CSV export
-5. Open **Settings** — show user admin and password controls
-
-For live scanning demos, configure `GROK_API_KEY` and `BLOB_READ_WRITE_TOKEN`.
 
 ## API Endpoints
 
@@ -155,7 +139,6 @@ For live scanning demos, configure `GROK_API_KEY` and `BLOB_READ_WRITE_TOKEN`.
 |----------|------|-------------|
 | `GET /api/health` | Public | Service health and live dependency probes |
 | `GET /api/auth/security-status` | Public | Detects if default seed passwords are still in use |
-| `POST /api/demo/seed` | Session | Load synthetic demo repair orders |
 | `GET /api/dashboard/summary` | Session | Manager/tech dashboard metrics |
 | `GET /api/audit-logs/summary` | Manager | Audit stats + chain verification |
 | `GET /api/audit-logs` | Manager | Filtered log list or CSV export |
@@ -166,7 +149,7 @@ For live scanning demos, configure `GROK_API_KEY` and `BLOB_READ_WRITE_TOKEN`.
 
 | Limitation | Impact | Mitigation |
 |------------|--------|------------|
-| **Pending xAI DPA** | RO text, VINs, diagnostic images, and OCR content are sent to xAI Grok for extraction and warranty story generation. Without a signed DPA, this is not approved for production customer data. | Complete xAI business onboarding; update consent language; restrict production to synthetic/demo data until signed. |
+| **Pending xAI DPA** | RO text, VINs, diagnostic images, and OCR content are sent to xAI Grok for extraction and warranty story generation. Without a signed DPA, this is not approved for production customer data. | Complete xAI business onboarding and execute DPA before processing live customer data. |
 | **Partial encryption** | OCR text, technician notes, and warranty stories remain plaintext in PostgreSQL. | Encrypt additional fields in a future release; restrict DB access; enable backups with encryption at rest. |
 | **Hash chain scope** | Audit log chain verifies append-only integrity per dealership, but a privileged DBA could rewrite the full table. | Pair with CSV exports, least-privilege DB access, and off-site backup retention. |
 | **Human review required** | AI-generated warranty stories are drafts only. | Technicians and managers must verify every story before Mercedes-Benz warranty submission. |
@@ -179,7 +162,6 @@ For live scanning demos, configure `GROK_API_KEY` and `BLOB_READ_WRITE_TOKEN`.
 - [ ] `npm run db:migrate:deploy` run against production database
 - [ ] `GET /api/health` returns `"status": "ok"` (or acceptable `"degraded"` with documented gaps)
 - [ ] `npm test` passes in CI/staging
-- [ ] `DEMO_MODE=false` if demo seeding should be disabled
 
 ## Project Structure
 
@@ -187,7 +169,7 @@ For live scanning demos, configure `GROK_API_KEY` and `BLOB_READ_WRITE_TOKEN`.
 prisma/migrations/     # Versioned schema migrations (use migrate deploy)
 src/app/api/           # REST API routes
 src/components/        # UI views (ManagerDashboard, AuditLogView, etc.)
-src/lib/               # Auth, encryption, audit chain, logging, demo data
+src/lib/               # Auth, encryption, audit chain, logging
 src/prompts/           # Audit-safe AI prompt templates
 src/services/          # Client-side OCR (Tesseract.js)
 ```
@@ -200,7 +182,7 @@ src/services/          # Client-side OCR (Tesseract.js)
 | `npm run build` | Production build |
 | `npm run db:migrate` | Create/apply migrations (dev) |
 | `npm run db:migrate:deploy` | Apply migrations (production) |
-| `npm run db:seed` | Seed dealership + demo accounts |
+| `npm run db:seed` | Seed dealership and initial accounts |
 | `npm test` | Run unit + integration tests |
 | `npm run test:integration` | Run integration tests only |
 

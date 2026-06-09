@@ -24,7 +24,7 @@ async function main() {
     update: {},
     create: {
       id: 'seed-dealership',
-      name: 'Mercedes-Benz of Demo City',
+      name: 'Mercedes-Benz Service Center',
     },
   });
 
@@ -63,7 +63,7 @@ async function main() {
 
   console.log('Seed complete.');
   console.log(`  ${managerEmail} (manager) — password from ADMIN_SEED_PASSWORD`);
-  console.log(`  ${techEmail} (technician) — password from TECH_SEED_PASSWORD or demo default`);
+  console.log(`  ${techEmail} (technician) — password from TECH_SEED_PASSWORD or default changeme123`);
 }
 
 main()

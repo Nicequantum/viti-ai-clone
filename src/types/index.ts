@@ -162,5 +162,4 @@ export const AUDIT_ACTIONS = [
   'user.reactivate',
   'user.password_reset',
   'image.upload',
-  'demo.seed',
 ] as const;

@@ -36,8 +36,8 @@ export async function checkSeedPasswordSecurity(): Promise<SeedSecurityStatus> {
         accountsUsingDefaults.push(account.email);
         warnings.push(
           techSeedPassword === DEFAULT_TECH_SEED_PASSWORD
-            ? 'Technician seed account still uses the default demo password (changeme123).'
-            : 'Technician account password matches TECH_SEED_PASSWORD — change it before a public demo or production use.'
+            ? 'Technician seed account still uses the default password (changeme123).'
+            : 'Technician account password matches TECH_SEED_PASSWORD — change it before production use.'
         );
       }
     }
@@ -49,7 +49,7 @@ export async function checkSeedPasswordSecurity(): Promise<SeedSecurityStatus> {
         if (matchesSeed) {
           accountsUsingDefaults.push(account.email);
           warnings.push(
-            'Manager account password matches ADMIN_SEED_PASSWORD — change it before a public demo or production use.'
+            'Manager account password matches ADMIN_SEED_PASSWORD — change it before production use.'
           );
         }
       }
