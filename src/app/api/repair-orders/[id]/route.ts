@@ -89,11 +89,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       const extractionSource: AdvisorExtractionSource = data.advisorExtractionSource || 'manual';
       const advisorNameToCapture = data.serviceAdvisorName || existingMapped.serviceAdvisorName;
 
-      let advisorCapture:
-        | Awaited<ReturnType<typeof captureAdvisorIntelligence>>
-        | null = null;
-
-      await prisma.$transaction(async (tx) => {
+      const advisorCapture = await prisma.$transaction(async (tx) => {
         await tx.repairOrder.update({
           where: { id },
           data: repairOrderToDbFields(input as Parameters<typeof repairOrderToDbFields>[0]),
@@ -135,23 +131,25 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           }
         }
 
-        if (advisorNameToCapture) {
-          advisorCapture = await captureAdvisorIntelligence(
-            {
-              dealershipId: session.dealershipId,
-              repairOrderId: id,
-              serviceAdvisorName: advisorNameToCapture,
-              complaints: input.complaints,
-              vehicle: {
-                make: input.vehicle.make,
-                model: input.vehicle.model,
-              },
-              extractionSource,
-              wasCorrected: data.complaintsWereCorrected ?? false,
-            },
-            tx
-          );
+        if (!advisorNameToCapture) {
+          return null;
         }
+
+        return captureAdvisorIntelligence(
+          {
+            dealershipId: session.dealershipId,
+            repairOrderId: id,
+            serviceAdvisorName: advisorNameToCapture,
+            complaints: input.complaints,
+            vehicle: {
+              make: input.vehicle.make,
+              model: input.vehicle.model,
+            },
+            extractionSource,
+            wasCorrected: data.complaintsWereCorrected ?? false,
+          },
+          tx
+        );
       });
 
       if (advisorCapture?.serviceAdvisor) {

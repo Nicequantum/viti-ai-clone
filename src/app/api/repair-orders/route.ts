@@ -134,11 +134,7 @@ export async function POST(request: Request) {
       const extractionSource: AdvisorExtractionSource =
         data.advisorExtractionSource || (data.fromExtraction ? 'grok' : 'manual');
 
-      let advisorCapture:
-        | Awaited<ReturnType<typeof captureAdvisorIntelligence>>
-        | null = null;
-
-      const created = await prisma.$transaction(async (tx) => {
+      const { created, advisorCapture } = await prisma.$transaction(async (tx) => {
         const ro = await tx.repairOrder.create({
           data: {
             ...repairOrderToDbFields(input),
@@ -151,27 +147,29 @@ export async function POST(request: Request) {
           include: { repairLines: true, serviceAdvisor: { select: { id: true, displayName: true } } },
         });
 
-        if (data.serviceAdvisorName) {
-          advisorCapture = await captureAdvisorIntelligence(
-            {
-              dealershipId: session.dealershipId,
-              repairOrderId: ro.id,
-              serviceAdvisorName: data.serviceAdvisorName,
-              complaints: input.complaints,
-              vehicle: {
-                make: input.vehicle.make,
-                model: input.vehicle.model,
+        const capture = data.serviceAdvisorName
+          ? await captureAdvisorIntelligence(
+              {
+                dealershipId: session.dealershipId,
+                repairOrderId: ro.id,
+                serviceAdvisorName: data.serviceAdvisorName,
+                complaints: input.complaints,
+                vehicle: {
+                  make: input.vehicle.make,
+                  model: input.vehicle.model,
+                },
+                extractionSource,
               },
-              extractionSource,
-            },
-            tx
-          );
-        }
+              tx
+            )
+          : null;
 
-        return tx.repairOrder.findUniqueOrThrow({
+        const createdRo = await tx.repairOrder.findUniqueOrThrow({
           where: { id: ro.id },
           include: { repairLines: true, serviceAdvisor: { select: { id: true, displayName: true } } },
         });
+
+        return { created: createdRo, advisorCapture: capture };
       });
 
       if (advisorCapture?.serviceAdvisor) {
