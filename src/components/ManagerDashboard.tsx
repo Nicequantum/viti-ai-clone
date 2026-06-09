@@ -10,6 +10,7 @@ import {
   Sparkles,
   Users,
 } from 'lucide-react';
+import { DealershipBranding } from '@/components/DealershipBranding';
 import { ScanROSection } from '@/components/ScanROSection';
 import type { PendingImage } from '@/types';
 import { toast } from 'sonner';
@@ -98,15 +99,19 @@ export function ManagerDashboard({
 
   return (
     <div className="px-4 pt-2 pb-8">
-      <div className="flex items-start justify-between pt-4 mb-5">
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.2em] text-[#0a84ff] font-semibold">Manager Dashboard</p>
-          <h1 className="text-2xl font-semibold tracking-tight mt-1">{session.dealershipName}</h1>
-          <p className="text-xs text-[#8e8e93] mt-1">Signed in as {session.name}</p>
-        </div>
-        <button onClick={onOpenSettings} className="p-2 text-[#8e8e93] touch-target" aria-label="Settings">
+      <div className="relative pt-4 mb-5">
+        <button
+          onClick={onOpenSettings}
+          className="absolute top-4 right-0 p-2 text-[#8e8e93] touch-target"
+          aria-label="Settings"
+        >
           <Settings size={22} />
         </button>
+        <p className="text-[10px] uppercase tracking-[0.2em] text-[#0a84ff] font-semibold text-center mb-3">
+          Manager Dashboard
+        </p>
+        <DealershipBranding size="md" />
+        <p className="text-xs text-[#8e8e93] mt-2 text-center">Signed in as {session.name}</p>
       </div>
 
       {loading ? (

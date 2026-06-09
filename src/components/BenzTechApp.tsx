@@ -104,7 +104,7 @@ export function BenzTechApp() {
   return (
     <div className="app-container">
       {ro.view !== 'home' && ro.view !== 'settings' && ro.view !== 'audit' && (
-        <AppHeader dealershipName={session.dealershipName} technicianName={session.name} onOpenSettings={goToSettings} />
+        <AppHeader technicianName={session.name} onOpenSettings={goToSettings} />
       )}
 
       {ro.view === 'home' && isManager && (
@@ -132,7 +132,6 @@ export function BenzTechApp() {
       {ro.view === 'home' && !isManager && (
         <HomeView
           technicianName={session.name}
-          dealershipName={session.dealershipName}
           filteredROs={ro.filteredROs}
           searchTerm={ro.searchTerm}
           onSearchChange={ro.setSearchTerm}

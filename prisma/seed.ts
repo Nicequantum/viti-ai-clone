@@ -21,10 +21,10 @@ async function main() {
 
   const dealership = await prisma.dealership.upsert({
     where: { id: 'seed-dealership' },
-    update: {},
+    update: { name: 'Mercedes-Benz of Tiverton' },
     create: {
       id: 'seed-dealership',
-      name: 'Mercedes-Benz Service Center',
+      name: 'Mercedes-Benz of Tiverton',
     },
   });
 

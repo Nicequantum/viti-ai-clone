@@ -5,6 +5,7 @@ import { ArrowLeft, Building2, KeyRound, LogOut, ScrollText, Shield, User, UserP
 import { toast } from 'sonner';
 import { api, type TechnicianUser } from '@/lib/api';
 import type { TechnicianSession } from '@/types';
+import { DealershipBranding } from '@/components/DealershipBranding';
 import { CONSENT_VERSION } from '@/types';
 
 interface SettingsViewProps {
@@ -134,9 +135,9 @@ export function SettingsView({ session, onBack, onLogout, onOpenAuditLogs }: Set
             <div className="text-[10px] text-[#666] capitalize">{session.role}</div>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-sm text-[#8e8e93]">
-          <Building2 size={14} />
-          {session.dealershipName}
+        <div className="flex flex-col items-center gap-2 pt-1">
+          <Building2 size={14} className="text-[#8e8e93]" />
+          <DealershipBranding size="sm" />
         </div>
       </div>
 

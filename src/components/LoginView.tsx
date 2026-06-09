@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { DealershipBranding } from '@/components/DealershipBranding';
 import { toast } from 'sonner';
 
 interface LoginViewProps {
@@ -65,8 +66,7 @@ export function LoginView({ onLogin }: LoginViewProps) {
           <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-[#0a84ff] to-[#0066cc] flex items-center justify-center mb-4 p-1">
             <img src="/icon-512.png" alt="Benz Tech" className="w-full h-full rounded-2xl" />
           </div>
-          <h1 className="text-3xl font-semibold tracking-tighter">Benz Tech</h1>
-          <p className="text-[#8e8e93] text-sm mt-1">Dealership Warranty Documentation Platform</p>
+          <DealershipBranding size="lg" />
         </div>
 
         <form onSubmit={handleSubmit} className="ios-card p-6 space-y-4">

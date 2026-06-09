@@ -1,10 +1,10 @@
 import { Settings } from 'lucide-react';
+import { DealershipBranding } from '@/components/DealershipBranding';
 import { ScanROSection } from '@/components/ScanROSection';
 import type { PendingImage, RepairOrder } from '../types';
 
 interface HomeViewProps {
   technicianName?: string;
-  dealershipName?: string;
   filteredROs: RepairOrder[];
   searchTerm: string;
   onSearchChange: (value: string) => void;
@@ -22,7 +22,6 @@ interface HomeViewProps {
 
 export function HomeView({
   technicianName,
-  dealershipName,
   filteredROs,
   searchTerm,
   onSearchChange,
@@ -52,10 +51,8 @@ export function HomeView({
           <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-[#0a84ff] to-[#0066cc] flex items-center justify-center mb-3 p-1">
             <img src="/icon-512.png" alt="Benz Tech - Mercedes-Benz" className="w-full h-full rounded-2xl" />
           </div>
-          <h1 className="text-3xl font-semibold tracking-tighter">Benz Tech</h1>
-          <p className="text-[#8e8e93] text-sm">
-            {dealershipName || 'Mercedes-Benz Dealership'} • {technicianName || 'Technician'}
-          </p>
+          <DealershipBranding size="lg" className="mb-2" />
+          <p className="text-[#8e8e93] text-sm text-center">{technicianName || 'Technician'}</p>
         </div>
 
         <ScanROSection
