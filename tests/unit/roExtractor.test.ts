@@ -7,6 +7,7 @@ import {
   extractServiceAdvisorFromText,
   isPlausibleComplaintText,
   mergeROExtractions,
+  normalizeComplaintForDisplay,
   parseStructuredROText,
   recoverComplaintsWithLabelsFromText,
 } from '../../src/utils/roExtractor';
@@ -298,6 +299,55 @@ F. SUNROOF WIND NOISE`);
     assert.equal(merged.complaints[0], 'RHODE ISLAND STATE INSPECTION');
     assert.equal(merged.complaints[5], 'SUNROOF WIND NOISE');
     assert.ok(!merged.complaints.some((c) => c.includes('_LI23')));
+  });
+
+  test('normalizeComplaintForDisplay strips customer states boilerplate and ellipsis', () => {
+    const cleaned = normalizeComplaintForDisplay(
+      'customer states... customer states that... CHECK ENGINE LIGHT ON'
+    );
+    assert.equal(cleaned, 'CHECK ENGINE LIGHT ON');
+  });
+
+  test('normalizeComplaintForDisplay fixes mixed case OCR within one complaint', () => {
+    const cleaned = normalizeComplaintForDisplay('RHODE island STATE INSPECTION');
+    assert.equal(cleaned, 'RHODE ISLAND STATE INSPECTION');
+  });
+
+  test('extracts page 2 complaints after customer states boilerplate', () => {
+    const ocrText = `=== PAGE 1 ===
+LINE OPCODE TECH TYPE HOURS
+# A
+customer states... RHODE ISLAND STATE INSPECTION
+# B
+CHECK ENGINE LIGHT ON
+
+=== PAGE 2 ===
+# C
+customer states that NOISE FROM REAR SUSPENSION
+# D
+BRAKE PULSATION AT STOP`;
+
+    const recovered = recoverComplaintsWithLabelsFromText(ocrText);
+    assert.deepEqual(recovered.labels, ['A', 'B', 'C', 'D']);
+    assert.equal(recovered.complaints[0], 'RHODE ISLAND STATE INSPECTION');
+    assert.equal(recovered.complaints[2], 'NOISE FROM REAR SUSPENSION');
+    assert.equal(recovered.complaints[3], 'BRAKE PULSATION AT STOP');
+  });
+
+  test('mergeROExtractions prefers cleaner Grok text over noisy OCR', () => {
+    const ocrText = `LINE OPCODE TECH TYPE HOURS
+# A
+customer states... cHeCk EnGiNe LiGhT oN
+# B
+RHODE island STATE INSPECTION`;
+
+    const grokExtracted = parseStructuredROText(`Customer Complaints:
+A. CHECK ENGINE LIGHT ON
+B. RHODE ISLAND STATE INSPECTION`);
+
+    const merged = mergeROExtractions(grokExtracted, parseStructuredROText(ocrText), ocrText);
+    assert.equal(merged.complaints[0], 'CHECK ENGINE LIGHT ON');
+    assert.equal(merged.complaints[1], 'RHODE ISLAND STATE INSPECTION');
   });
 
   test('mergeROExtractions prefers non-empty service advisor name', () => {

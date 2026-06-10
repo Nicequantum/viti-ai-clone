@@ -7,7 +7,11 @@ import { preprocessImageForOCR, runOCR } from '@/services/ocr';
 import type { AppView, ExtractedData, ImageAttachment, PendingImage, RepairLine, RepairOrder } from '@/types';
 import { emptyExtractedData, mergeExtracted, parseDiagnosticText } from '@/utils/diagnosticParser';
 import { getSuggestions } from '@/utils/mercedesKb';
-import { createManualRepairOrder, createNewRepairLine } from '@/utils/repairOrderFactory';
+import {
+  createManualRepairOrder,
+  createNewRepairLine,
+  syncRepairLinesWithComplaints,
+} from '@/utils/repairOrderFactory';
 import {
   extractComplaints,
   extractCustomerName,
@@ -219,7 +223,7 @@ export function useRepairOrders({
             const img = images[i];
             setScanStatusMessage(`Reading page ${i + 1} of ${images.length} on device…`);
             setOcrProgress(Math.round(30 + (i / images.length) * 15));
-            const preprocessed = await preprocessImageForOCR(img.file, 'fast');
+            const preprocessed = await preprocessImageForOCR(img.file, 'full');
             const text = await runOCR(preprocessed, (p) =>
               setOcrProgress(Math.round(45 + (i / images.length) * 35 + (p / images.length) * 35))
             );
@@ -428,18 +432,13 @@ export function useRepairOrders({
     (newComplaints: string[], newLabels?: string[]) => {
       const latestRO = getLatestRO();
       if (!latestRO) return;
-      let updatedLines = latestRO.repairLines;
-      if (newComplaints.length > 0) {
-        const oldFirst = latestRO.complaints[0] || '';
-        updatedLines = latestRO.repairLines.map((l, idx) => {
-          if (idx === 0 && (!l.customerConcern || l.customerConcern === oldFirst)) {
-            return { ...l, customerConcern: newComplaints[0] || '' };
-          }
-          return l;
-        });
-      }
       const complaintLabels =
         newLabels && newLabels.length === newComplaints.length ? newLabels : latestRO.complaintLabels;
+      const updatedLines = syncRepairLinesWithComplaints(
+        latestRO.repairLines,
+        newComplaints,
+        complaintLabels
+      );
       const updated = { ...latestRO, complaints: newComplaints, complaintLabels, repairLines: updatedLines };
       setCurrentRO(updated);
       setAllROs((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));

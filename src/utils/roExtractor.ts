@@ -1,12 +1,13 @@
 import type { StructuredROExtraction, VehicleInfo } from '../types';
 
 const HEADER_ROW_PATTERN = /LINE\s+OPCODE\s+TECH\s+TYPE\s+HOURS/i;
-const COMPLAINT_SECTION_MARKERS = [
+const COMPLAINT_SECTION_HEADERS = [
   HEADER_ROW_PATTERN,
   /Customer\s+Complaints?/i,
-  /CUST(?:OMER)?\s+(?:STATES?|COMPLAINT|CONCERN)/i,
   /COMPLAINT\s+LINE/i,
 ];
+/** Only used when no hashtag labels or structural headers are present. */
+const COMPLAINT_SECTION_FALLBACK_MARKERS = [/CUST(?:OMER)?\s+(?:STATES?|COMPLAINT|CONCERN)/i];
 
 const JUNK_COMPLAINT_PREFIX =
   /^(vin|mile|km|ro\s*#|date|tech|name|model|customer|service|advisor|authorized|total|tax|parts|shop|dealer|labor|signature|opcode|line|hours|type|passed|cdef|risi)$/i;
@@ -111,7 +112,12 @@ function isHashtagLabelOnlyLine(line: string): string | null {
 }
 
 function preprocessComplaintSectionLines(section: string): string[] {
-  const lines = section.replace(/\r\n/g, '\n').split('\n').map((l) => l.trim()).filter(Boolean);
+  const lines = section
+    .replace(PAGE_MARKER_PATTERN, '\n')
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
   const out: string[] = [];
 
   for (let line of lines) {
@@ -149,6 +155,7 @@ function buildComplaintTimeline(lines: string[]): ComplaintTimelineEntry[] {
     }
 
     if (isInspectionDetailLine(line)) continue;
+    if (FORM_JUNK_LINE.test(line)) continue;
     const content = normalizeComplaintContent(line);
     if (isValidComplaintText(content)) timeline.push({ kind: 'text', text: content });
   }
@@ -185,13 +192,17 @@ function pairComplaintTimeline(timeline: ComplaintTimelineEntry[]): LabeledCompl
       index++;
     }
 
-    const plausibleTexts = texts.filter((value) => isPlausibleComplaintText(value));
+    const plausibleTexts = texts
+      .map((value) => normalizeComplaintForDisplay(value))
+      .filter((value) => value && isPlausibleComplaintText(value));
 
     if (labels.length === 1) {
-      results.push({ letter: labels[0], text: plausibleTexts.join(' ').trim() });
+      const joined = normalizeComplaintForDisplay(plausibleTexts.join(' '));
+      results.push({ letter: labels[0], text: joined });
     } else {
       labels.forEach((letter, idx) => {
-        results.push({ letter, text: plausibleTexts[idx] || '' });
+        const text = normalizeComplaintForDisplay(plausibleTexts[idx] || '');
+        results.push({ letter, text });
       });
     }
   }
@@ -199,10 +210,42 @@ function pairComplaintTimeline(timeline: ComplaintTimelineEntry[]): LabeledCompl
   return results;
 }
 
+function mergeOrderedComplaintPages(pages: LabeledComplaint[][]): LabeledComplaint[] {
+  const byLetter = new Map<string, string>();
+  const order: string[] = [];
+
+  for (const page of pages) {
+    for (const { letter, text: value } of page) {
+      if (!order.includes(letter)) order.push(letter);
+      const existing = byLetter.get(letter) || '';
+      const normalized = normalizeComplaintForDisplay(value);
+      if (normalized && (!existing || normalized.length > existing.length)) {
+        byLetter.set(letter, normalized);
+      }
+    }
+  }
+
+  return order.map((letter) => ({ letter, text: byLetter.get(letter) || '' }));
+}
+
 /** Ordered hashtag complaints from OCR — preserves document order (not alphabetical). */
 export function extractOrderedHashtagComplaints(text: string): LabeledComplaint[] {
   if (!text?.trim()) return [];
-  const section = getComplaintSection(text.replace(/\r\n/g, '\n'));
+
+  const normalized = text.replace(/\r\n/g, '\n');
+  const pageChunks = normalized.split(PAGE_MARKER_PATTERN).map((chunk) => chunk.trim()).filter(Boolean);
+
+  if (pageChunks.length > 1) {
+    const perPage = pageChunks.map((chunk) => {
+      const section = getComplaintSection(chunk);
+      const lines = preprocessComplaintSectionLines(section);
+      return pairComplaintTimeline(buildComplaintTimeline(lines));
+    });
+    const merged = mergeOrderedComplaintPages(perPage);
+    if (merged.some((entry) => entry.text)) return merged;
+  }
+
+  const section = getComplaintSection(normalized);
   const lines = preprocessComplaintSectionLines(section);
   return pairComplaintTimeline(buildComplaintTimeline(lines));
 }
@@ -236,12 +279,115 @@ function extractPlainLineStartComplaints(section: string): Map<string, string> {
   return byLetter;
 }
 
+const PAGE_MARKER_PATTERN = /===?\s*PAGE\s+\d+\s*===?/gi;
+const CUSTOMER_STATES_PREFIX =
+  /^(?:c\s*\/\s*s|cust(?:omer)?\s+states?(?:\s+that)?)\s*[:\.\-–—]*\s*/i;
+const FORM_JUNK_LINE =
+  /^(?:vin|mileage|odometer|authorized|signature|print\s+name|phone|total|parts|labor|tax|shop|dealer|ro\s*#|date|model\s+year|===?\s*PAGE)/i;
+
 function normalizeComplaintText(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
+function stripPageMarkers(text: string): string {
+  return text.replace(PAGE_MARKER_PATTERN, '\n').replace(/\s+/g, ' ').trim();
+}
+
+function normalizeMixedCaseWord(word: string, preferAllCaps: boolean): string {
+  if (word.length < 3) return word;
+  if (preferAllCaps && /[a-z]/.test(word)) return word.toUpperCase();
+
+  const hasUpper = /[A-Z]/.test(word);
+  const hasLower = /[a-z]/.test(word);
+  if (!hasUpper || !hasLower) return word;
+  if (preferAllCaps) return word.toUpperCase();
+
+  const letters = word.replace(/[^A-Za-z]/g, '');
+  const upperCount = (letters.match(/[A-Z]/g) || []).length;
+  const lowerCount = (letters.match(/[a-z]/g) || []).length;
+  if (upperCount >= lowerCount) return word.toUpperCase();
+  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+}
+
+function preferAllCapsComplaintStyle(words: string[]): boolean {
+  const styled = words.filter((w) => w.length >= 3 && /[A-Za-z]/.test(w));
+  if (styled.length === 0) return false;
+  const allCapsWords = styled.filter((w) => w === w.toUpperCase() && /[A-Z]/.test(w)).length;
+  return allCapsWords / styled.length >= 0.5;
+}
+
+function dedupeRepeatedPhrases(text: string): string {
+  let result = text;
+  result = result.replace(/(customer\s+states(?:\s+that)?[\s.:;-]+)/gi, (_match, _grp, offset) =>
+    offset === 0 ? '' : ' '
+  );
+  result = normalizeComplaintText(result);
+
+  const words = result.split(/\s+/);
+  if (words.length >= 6) {
+    for (let size = Math.floor(words.length / 2); size >= 3; size--) {
+      const first = words.slice(0, size).join(' ');
+      const second = words.slice(size, size * 2).join(' ');
+      if (first.toLowerCase() === second.toLowerCase()) {
+        return words.slice(0, size).join(' ');
+      }
+    }
+  }
+
+  const compact = result.replace(/\s+/g, ' ').trim();
+  const mid = Math.floor(compact.length / 2);
+  if (mid > 12) {
+    const firstHalf = compact.slice(0, mid).trim();
+    const secondHalf = compact.slice(mid).trim();
+    if (firstHalf.toLowerCase() === secondHalf.toLowerCase()) return firstHalf;
+  }
+
+  return result;
+}
+
+/** Clean OCR noise: boilerplate, ellipsis, mixed case, duplicate phrases. */
+export function normalizeComplaintForDisplay(text: string): string {
+  if (!text?.trim()) return '';
+
+  let cleaned = stripPageMarkers(text);
+  cleaned = cleaned.replace(CUSTOMER_STATES_PREFIX, '');
+  cleaned = cleaned.replace(/\.{2,}/g, ' ');
+  cleaned = cleaned.replace(/[,;:!?]{2,}/g, ' ');
+  cleaned = cleaned.replace(/\s+([,.;:])\s*/g, '$1 ');
+  cleaned = dedupeRepeatedPhrases(cleaned);
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  const preferAllCaps = preferAllCapsComplaintStyle(words);
+  cleaned = words.map((word) => normalizeMixedCaseWord(word, preferAllCaps)).join(' ');
+  cleaned = normalizeComplaintText(cleaned.replace(/^[\s.:;,\-–—]+|[\s.:;,\-–—]+$/g, ''));
+  return cleaned;
+}
+
+function complaintQualityScore(text: string): number {
+  const trimmed = normalizeComplaintText(text);
+  if (!trimmed) return 0;
+  let score = Math.min(trimmed.length, 120);
+  const words = trimmed.split(/\s+/);
+  if (words.some((w) => w.length >= 7)) score += 12;
+  if (/[a-z]/.test(trimmed) && /[A-Z]/.test(trimmed) && words.length >= 3) score -= 8;
+  if (/\.{2,}|_{2,}|={2,}/.test(trimmed)) score -= 10;
+  if (/^(customer\s+states|cust\s+states)/i.test(trimmed)) score -= 6;
+  if (!isPlausibleComplaintText(trimmed)) score -= 40;
+  return score;
+}
+
+function pickBestComplaintCandidate(ocrText: string, grokText: string): string {
+  const ocr = normalizeComplaintForDisplay(ocrText);
+  const grok = normalizeComplaintForDisplay(grokText);
+  const ocrOk = ocr && isPlausibleComplaintText(ocr);
+  const grokOk = grok && isPlausibleComplaintText(grok);
+  if (ocrOk && grokOk) {
+    return complaintQualityScore(ocr) >= complaintQualityScore(grok) ? ocr : grok;
+  }
+  return (ocrOk ? ocr : '') || (grokOk ? grok : '');
+}
+
 function normalizeComplaintContent(text: string): string {
-  return normalizeComplaintText(text.replace(/^RISI\s+/i, ''));
+  return normalizeComplaintForDisplay(text.replace(/^RISI\s+/i, ''));
 }
 
 function isInspectionDetailLine(text: string): boolean {
@@ -290,13 +436,24 @@ function isComplaintLetter(letter: string, text: string): boolean {
 }
 
 function getComplaintSection(text: string): string {
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const hasHashtagLabels = /#\s*[A-Z]\b/i.test(text);
+  const markers = hasHashtagLabels
+    ? COMPLAINT_SECTION_HEADERS
+    : [...COMPLAINT_SECTION_HEADERS, ...COMPLAINT_SECTION_FALLBACK_MARKERS];
+
   let bestIndex = -1;
-  for (const marker of COMPLAINT_SECTION_MARKERS) {
-    const match = text.match(marker);
-    if (match && match.index !== undefined && (bestIndex < 0 || match.index < bestIndex)) {
-      bestIndex = match.index;
+  let offset = 0;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    for (const marker of markers) {
+      if (!marker.test(trimmed)) continue;
+      if (bestIndex < 0 || offset < bestIndex) bestIndex = offset;
+      break;
     }
+    offset += line.length + 1;
   }
+
   if (bestIndex >= 0) return text.slice(bestIndex);
   return text;
 }
@@ -396,13 +553,17 @@ function mergeComplaintsWithGrokFallback(
     const labels: string[] = [];
 
     for (const { letter, text: ocrInline } of ordered) {
-      const ocrTextCandidate =
-        ocrInline && isPlausibleComplaintText(ocrInline) ? ocrInline : '';
       const grokText = grokMap.get(letter) || '';
-      const picked = ocrTextCandidate || (isPlausibleComplaintText(grokText) ? grokText : '');
+      const picked = pickBestComplaintCandidate(ocrInline || '', grokText);
       if (picked) {
         labels.push(letter);
         complaints.push(picked);
+      } else if (grokText) {
+        const fallback = normalizeComplaintForDisplay(grokText);
+        if (fallback && isPlausibleComplaintText(fallback)) {
+          labels.push(letter);
+          complaints.push(fallback);
+        }
       }
     }
 
@@ -549,9 +710,20 @@ export function mergeROExtractions(
   const recovered = supplementRawText.trim()
     ? mergeComplaintsWithGrokFallback(supplementRawText, primary)
     : recoverComplaintsWithLabelsFromText('', primary.complaints);
-  const complaints = sanitizeComplaints(recovered.complaints);
-  const complaintLabels =
-    recovered.labels && recovered.labels.length === complaints.length ? recovered.labels : undefined;
+
+  const complaints: string[] = [];
+  const complaintLabels: string[] = [];
+  recovered.complaints.forEach((raw, index) => {
+    const cleaned = normalizeComplaintForDisplay(raw);
+    if (!isPlausibleComplaintText(cleaned)) return;
+    complaints.push(cleaned);
+    const label = recovered.labels?.[index];
+    if (label) complaintLabels.push(label);
+  });
+  const alignedLabels =
+    complaintLabels.length === complaints.length && complaintLabels.length > 0
+      ? complaintLabels
+      : undefined;
 
   return {
     roNumber: pickNonEmpty(primary.roNumber, supplement.roNumber),
@@ -562,7 +734,7 @@ export function mergeROExtractions(
     ) || undefined,
     vehicle: mergeVehicleFields(primary.vehicle, supplement.vehicle),
     complaints,
-    complaintLabels,
+    complaintLabels: alignedLabels,
   };
 }
 
@@ -957,7 +1129,10 @@ export function extractRoNumberFromText(text: string): string {
 }
 
 export function sanitizeComplaints(complaints: string[]): string[] {
-  return complaints.filter((c) => isPlausibleComplaintText(c));
+  return complaints
+    .map((c) => normalizeComplaintForDisplay(c))
+    .filter((c) => isPlausibleComplaintText(c))
+    .slice(0, 15);
 }
 
 export function sanitizeVehicle(vehicle: VehicleInfo): VehicleInfo {

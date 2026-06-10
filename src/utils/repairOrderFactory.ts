@@ -1,17 +1,65 @@
 import type { RepairLine, RepairOrder, VehicleInfo } from '../types';
 import { emptyExtractedData } from './diagnosticParser';
 
-function defaultRepairLine(complaint?: string, lineNumber = 1): RepairLine {
+function defaultRepairLine(complaint?: string, lineNumber = 1, label?: string): RepairLine {
+  const concern = complaint || '';
+  const prefix = label ? `${label}. ` : '';
+  const description = concern
+    ? `${prefix}${concern}`.slice(0, 72)
+    : 'Enter repair description';
   return {
     id: `line-${Date.now()}-${lineNumber}`,
     lineNumber,
-    description: complaint ? complaint.slice(0, 60) : 'Enter repair description',
-    customerConcern: complaint || '',
+    description,
+    customerConcern: concern,
     technicianNotes: '',
     xentryImages: [],
     xentryOcrTexts: [],
     extractedData: emptyExtractedData(),
   };
+}
+
+/** Keep repair lines aligned with complaint list — one clickable line per concern. */
+export function syncRepairLinesWithComplaints(
+  existingLines: RepairLine[],
+  complaints: string[],
+  complaintLabels?: string[]
+): RepairLine[] {
+  if (complaints.length === 0) {
+    return existingLines.length > 0 ? existingLines : [defaultRepairLine()];
+  }
+
+  const baseId = Date.now();
+  return complaints.map((complaint, index) => {
+    const lineNumber = index + 1;
+    const label = complaintLabels?.[index] || String.fromCharCode(65 + index);
+    const prior = existingLines[index];
+    const concern = complaint || '';
+    const prefix = `${label}. `;
+    const description = concern ? `${prefix}${concern}`.slice(0, 72) : 'Enter repair description';
+
+    if (prior) {
+      const concernChanged = prior.customerConcern !== concern;
+      const descLooksAuto =
+        !prior.description ||
+        prior.description === 'Enter repair description' ||
+        prior.description === 'New repair item' ||
+        prior.description.startsWith(`${label}. `) ||
+        prior.description === prior.customerConcern?.slice(0, 60) ||
+        prior.description === prior.customerConcern?.slice(0, 72);
+      return {
+        ...prior,
+        lineNumber,
+        customerConcern: concern,
+        description: concernChanged || descLooksAuto ? description : prior.description,
+      };
+    }
+
+    return {
+      ...defaultRepairLine(concern, lineNumber, label),
+      id: `line-${baseId}-${lineNumber}`,
+    };
+  });
 }
 
 export function createRepairOrderFromScan(params: {
@@ -22,7 +70,15 @@ export function createRepairOrderFromScan(params: {
   complaintLabels?: string[];
   serviceAdvisorName?: string;
 }): RepairOrder {
-  const firstComplaint = params.complaints[0];
+  const labels =
+    params.complaintLabels && params.complaintLabels.length === params.complaints.length
+      ? params.complaintLabels
+      : params.complaints.map((_, i) => String.fromCharCode(65 + i));
+  const repairLines =
+    params.complaints.length > 0
+      ? params.complaints.map((complaint, i) => defaultRepairLine(complaint, i + 1, labels[i]))
+      : [defaultRepairLine()];
+
   return {
     id: 'ro-' + Date.now(),
     roNumber: params.roNumber,
@@ -34,7 +90,7 @@ export function createRepairOrderFromScan(params: {
     xentryImages: [],
     xentryOcrTexts: [],
     createdAt: new Date().toISOString(),
-    repairLines: [defaultRepairLine(firstComplaint)],
+    repairLines,
   };
 }
 
