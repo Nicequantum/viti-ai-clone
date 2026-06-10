@@ -54,6 +54,8 @@ export function useRepairOrders({
   const [isGenerating, setIsGenerating] = useState(false);
   const [loading, setLoading] = useState(true);
   const scanCancelledRef = useRef(false);
+  const scanInFlightRef = useRef(false);
+  const scanSessionRef = useRef(0);
 
   const refreshList = useCallback(async () => {
     const { repairOrders } = await api.listRepairOrders();
@@ -64,6 +66,21 @@ export function useRepairOrders({
   useEffect(() => {
     refreshList().catch(() => setLoading(false));
   }, [refreshList]);
+
+  /** Prevent blank screen when view points at RO/line but selection was cleared mid-scan. */
+  useEffect(() => {
+    if (view === 'ro' && !currentRO) {
+      setView('home');
+      return;
+    }
+    if (view === 'line') {
+      const lineExists =
+        !!currentRO && !!currentLineId && currentRO.repairLines.some((line) => line.id === currentLineId);
+      if (!lineExists) {
+        setView(currentRO ? 'ro' : 'home');
+      }
+    }
+  }, [view, currentRO, currentLineId]);
 
   const persistRO = useCallback(
     async (ro: RepairOrder): Promise<RepairOrder> => {
@@ -173,7 +190,7 @@ export function useRepairOrders({
       customerName: string;
       roNumber?: string;
       serviceAdvisorName?: string;
-    }) => {
+    }): Promise<boolean> => {
       try {
         const finalized = finalizeLabeledComplaints(
           extracted.complaints || [],
@@ -195,8 +212,10 @@ export function useRepairOrders({
         setCurrentRO(repairOrder);
         setView('ro');
         toast.success('Repair order created from scan');
+        return true;
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Failed to create repair order');
+        return false;
       }
     },
     []
@@ -209,9 +228,21 @@ export function useRepairOrders({
   const processScanImages = useCallback(
     async (images: PendingImage[]) => {
       if (images.length === 0) return;
+      if (scanInFlightRef.current) {
+        toast.message('Scan already in progress…');
+        return;
+      }
+
+      const sessionId = ++scanSessionRef.current;
+      const isActiveSession = () =>
+        scanSessionRef.current === sessionId && !scanCancelledRef.current;
+
       scanCancelledRef.current = false;
+      scanInFlightRef.current = true;
       onOcrStart('Uploading documents…');
       setPendingROImages(images);
+
+      let createdSuccessfully = false;
 
       try {
         setOcrProgress(8);
@@ -220,22 +251,23 @@ export function useRepairOrders({
           images.map((img) => img.file),
           'roimg'
         );
-        if (scanCancelledRef.current) return;
+        if (!isActiveSession()) return;
 
         const imagePathnames = attachments.map((a) => a.pathname);
 
         const runClientOcr = async () => {
           let combinedText = '';
           for (let i = 0; i < images.length; i++) {
-            if (scanCancelledRef.current) return '';
+            if (!isActiveSession()) return '';
             const img = images[i];
             setScanStatusMessage(
               `Reading page ${i + 1} of ${images.length} (multi-pass OCR for accuracy)…`
             );
             setOcrProgress(Math.round(30 + (i / images.length) * 15));
-            const text = await runMultiPassOCR(img.file, (p) =>
-              setOcrProgress(Math.round(45 + (i / images.length) * 35 + (p / images.length) * 35))
-            );
+            const text = await runMultiPassOCR(img.file, (p) => {
+              if (!isActiveSession()) return;
+              setOcrProgress(Math.round(45 + (i / images.length) * 35 + (p / images.length) * 35));
+            });
             combinedText += `\n\n=== PAGE ${i + 1} ===\n` + text;
           }
           return combinedText;
@@ -253,14 +285,16 @@ export function useRepairOrders({
         setScanStatusMessage('AI vision extraction in progress (OCR continues in parallel)…');
 
         const [ocrText, grokExtracted] = await Promise.all([ocrPromise, grokPromise]);
-        if (scanCancelledRef.current) return;
+        if (!isActiveSession()) return;
 
         if (!ocrText?.trim() && !grokExtracted) {
           throw new Error('Could not read the repair order. Try sharper photos or fewer pages.');
         }
 
         const classifiedPages = classifyScanPages(ocrText || '');
-        const roOcrText = combineRepairOrderPages(classifiedPages) || ocrText || '';
+        const roOcrText =
+          combineRepairOrderPages(classifiedPages) ||
+          (classifiedPages.some((page) => page.kind === 'repair_order') ? '' : ocrText || '');
         const vmiOcrText = combineVmiPages(classifiedPages);
         const vmiWarranty = extractVmiWarrantyInfo(vmiOcrText);
 
@@ -280,24 +314,32 @@ export function useRepairOrders({
           };
         }
 
-        if (scanCancelledRef.current) return;
+        if (!isActiveSession()) return;
         setOcrProgress(88);
         setScanStatusMessage('Creating repair order…');
-        await createROFromExtracted(extracted);
+        createdSuccessfully = await createROFromExtracted(extracted);
+        if (!createdSuccessfully) {
+          throw new Error('Failed to create repair order from scan.');
+        }
 
-        if (scanCancelledRef.current) return;
+        if (!isActiveSession()) return;
         setOcrProgress(100);
         setScanStatusMessage('Scan complete');
         clearPendingPreviews(images);
         setPendingROImages([]);
       } catch (error) {
-        if (scanCancelledRef.current) return;
+        if (!isActiveSession()) return;
         console.error('RO scan error', error);
         toast.error(error instanceof Error ? error.message : 'Scan failed. Try fewer pages or sharper photos.');
-        clearPendingPreviews(images);
-        setPendingROImages([]);
+        if (!createdSuccessfully) {
+          setPendingROImages(images);
+        } else {
+          clearPendingPreviews(images);
+          setPendingROImages([]);
+        }
       } finally {
-        if (!scanCancelledRef.current) {
+        if (scanSessionRef.current === sessionId) {
+          scanInFlightRef.current = false;
           onOcrFinish();
         }
       }
@@ -305,7 +347,6 @@ export function useRepairOrders({
     [
       clearPendingPreviews,
       createROFromExtracted,
-      createROFromText,
       onOcrStart,
       onOcrFinish,
       setOcrProgress,
@@ -371,11 +412,16 @@ export function useRepairOrders({
   }, [appendScanPages]);
 
   const processPendingScan = useCallback(async () => {
+    if (scanInFlightRef.current) {
+      toast.message('Scan already in progress…');
+      return;
+    }
     if (pendingROImages.length === 0) {
       toast.message('Add at least one page before processing.');
       return;
     }
-    await processScanImages(pendingROImages);
+    const snapshot = [...pendingROImages];
+    await processScanImages(snapshot);
   }, [pendingROImages, processScanImages]);
 
   const clearPendingScan = useCallback(() => {
@@ -385,7 +431,9 @@ export function useRepairOrders({
   }, [clearPendingPreviews, pendingROImages]);
 
   const cancelScan = useCallback(() => {
+    scanSessionRef.current += 1;
     scanCancelledRef.current = true;
+    scanInFlightRef.current = false;
     clearPendingPreviews(pendingROImages);
     setPendingROImages([]);
     onOcrFinish();

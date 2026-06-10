@@ -78,6 +78,7 @@ export function ScanROSection({
         <div className="flex gap-2 mb-2">
           <button
             onClick={onProcessScan}
+            disabled={isProcessingOCR}
             className={`primary-btn flex-[2] ${buttonHeight} flex items-center justify-center gap-2 ${buttonText} font-semibold`}
           >
             <Sparkles size={compact ? 16 : 18} />

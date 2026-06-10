@@ -15,6 +15,14 @@ const TESSERACT_OPTS = {
 let sharedWorker: Tesseract.Worker | null = null;
 let workerInitPromise: Promise<Tesseract.Worker> | null = null;
 let progressListener: ((p: number) => void) | null = null;
+/** Serialize recognize() — the shared Tesseract worker is not safe for parallel jobs. */
+let ocrJobChain: Promise<unknown> = Promise.resolve();
+
+function withOcrLock<T>(fn: () => Promise<T>): Promise<T> {
+  const job = ocrJobChain.then(() => fn());
+  ocrJobChain = job.then(() => undefined).catch(() => undefined);
+  return job;
+}
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -249,29 +257,34 @@ export async function runOCR(
   onProgress?: (p: number) => void,
   pageSegMode: OcrPageSegMode = '6'
 ): Promise<string> {
-  progressListener = onProgress ?? null;
-  const recognize = async () => {
-    const worker = await getSharedWorker();
-    const {
-      data: { text },
-    } = await worker.recognize(imageSource as File, {
-      tessedit_pageseg_mode: pageSegMode,
-      tessedit_oem: '3',
-      tessedit_char_whitelist:
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,:;/-_()[]#%&*+=@\'" \n',
-    } as Record<string, string>);
-    return text;
-  };
+  return withOcrLock(async () => {
+    const localProgress = onProgress ?? null;
+    progressListener = localProgress;
+    const recognize = async () => {
+      const worker = await getSharedWorker();
+      const {
+        data: { text },
+      } = await worker.recognize(imageSource as File, {
+        tessedit_pageseg_mode: pageSegMode,
+        tessedit_oem: '3',
+        tessedit_char_whitelist:
+          'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,:;/-_()[]#%&*+=@\'" \n',
+      } as Record<string, string>);
+      return text;
+    };
 
-  if (onProgress) onProgress(5);
+    if (localProgress) localProgress(5);
 
-  try {
-    const text = await withTimeout(recognize(), OCR_TIMEOUT_MS, 'On-device OCR');
-    if (onProgress) onProgress(100);
-    return text;
-  } finally {
-    progressListener = null;
-  }
+    try {
+      const text = await withTimeout(recognize(), OCR_TIMEOUT_MS, 'On-device OCR');
+      if (localProgress) localProgress(100);
+      return text;
+    } finally {
+      if (progressListener === localProgress) {
+        progressListener = null;
+      }
+    }
+  });
 }
 
 const COMPLAINT_LINE_RE = /^#\s*[A-Z]\b/i;
