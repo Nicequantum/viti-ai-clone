@@ -11,20 +11,29 @@ VEHICLE FIELDS (top header):
 CUSTOMER COMPLAINTS (HIGHEST PRIORITY — DO NOT SKIP LINE A):
 Real dealership ROs use minimal formatting. Complaints are NOT always preceded by "Customer states" or colons.
 
-CRITICAL FORMAT — letter + space + text (period optional). Many ROs prefix with hashtag:
-  # A RHODE ISLAND STATE INSPECTION
-  # B CHECK ENGINE LIGHT ON
-  # C NOISE FROM FRONT SUSPENSION
-  A RHODE ISLAND STATE INSPECTION
-  B CHECK ENGINE LIGHT ON
-  C. NOISE FROM FRONT SUSPENSION
+CRITICAL FORMAT — hashtag + letter is the dealership standard. Common layouts:
+
+  Layout 1 — one complaint per line:
+    # A RHODE ISLAND STATE INSPECTION
+    # B CHECK ENGINE LIGHT ON
+
+  Layout 2 — comma-separated label row, text on following lines:
+    # A, # B, # C, # D, # E, # F
+    RHODE ISLAND STATE INSPECTION
+    CHECK ENGINE LIGHT ON
+    (one complaint text line per letter, in order)
+
+  Layout 3 — inline comma-separated:
+    # A, RHODE ISLAND STATE INSPECTION, # B, CHECK ENGINE LIGHT ON
+
+  Legacy (no hashtag): A RHODE ISLAND STATE INSPECTION / B CHECK ENGINE LIGHT ON
 
 Rules:
-1. Find the complaint section (header row often reads "LINE OPCODE TECH TYPE HOURS" or similar).
-2. Extract EVERY line that starts with "# " + LETTER + SPACE, or a SINGLE CAPITAL LETTER followed by a SPACE, then complaint text.
-3. Line A is frequently the FIRST complaint immediately after the header — minimal spacing, plain sentence, ALL CAPS is common. NEVER skip Line A.
-4. A line starting with "# A " or "A " (letter A + space) IS a complaint even with no period, colon, or bullet.
-5. Preserve the EXACT letter labels from the RO (A, B, C, E, F — letters may skip, e.g. no D).
+1. Find the complaint section (header row often reads "LINE OPCODE TECH TYPE HOURS" or similar). Search ALL pages.
+2. Extract EVERY complaint for labels # A through # F (or however many appear). Format is "#" + space + LETTER, often separated by commas.
+3. Line A is frequently the FIRST complaint — NEVER skip Line A.
+4. The text AFTER each label is the complaint. Do NOT invent letters from words inside complaint text (e.g. "RHODE ISLAND" does NOT create lines E, I, L, N).
+5. Preserve EXACT letter labels from the RO (A, B, C, D, E, F — use only labels actually printed on the RO).
 6. Lines WITHOUT a leading letter (e.g. "RISI RHODE ISLAND STATE INSPECTION", "619 CDEF", "130132 PASSED") are continuation/inspection detail — attach mentally to the prior lettered line but output ONLY the lettered complaint lines A, B, C…
 7. Also capture complaints after phrases: "Customer states", "Customer complaint", "C/S", "Concern", "state inspection".
 8. Search ALL pages/images. If truly none, output exactly "None listed."

@@ -16,22 +16,47 @@ const INSPECTION_DETAIL_LINE =
   /^(?:RISI\b|CDEF\b|PASSED\b|\d{3,}\s*(?:PASSED|CDEF|RISI)\b)/i;
 
 const LETTER_LABEL_PATTERN = /^([A-Z])\s+(.+)$/;
-const HASHTAG_LETTER_LABEL_PATTERN = /^#\s*([A-Z])\s+(.+)$/i;
+const HASHTAG_LETTER_PART_PATTERN = /^#\s*([A-Z])\b[,\s:.\-–—]*\s*(.*)$/i;
 const LETTER_LABEL_OUTPUT_PATTERN = /^#?\s*([A-Z])[\.\)\:\s\-–—–—]+\s*(.+)$/i;
+/** Split only on explicit hashtag labels — never on capitals inside complaint words. */
+const HASHTAG_BOUNDARY_SPLIT = /\s+(?=#\s*[A-Z]\b)/i;
 
 export interface LabeledComplaint {
   letter: string;
   text: string;
 }
 
-function parseComplaintLabelSegment(segment: string): LabeledComplaint | null {
-  const trimmed = segment.trim();
+function collectExplicitHashtagLabels(text: string): Set<string> {
+  return new Set([...text.matchAll(/#\s*([A-Z])\b/gi)].map((m) => m[1].toUpperCase()));
+}
+
+function letterAppearsAsComplaintLabel(text: string, letter: string): boolean {
+  return (
+    new RegExp(`#\\s*${letter}\\b`, 'i').test(text) ||
+    new RegExp(`(?:^|\\n)\\s*${letter}(?:[\\.\\)\\:\\s\\-–—]+\\S|\\s+\\S)`, 'im').test(text)
+  );
+}
+
+function parseHashtagComplaintPart(part: string): LabeledComplaint | null {
+  const trimmed = part.trim();
   if (!trimmed) return null;
 
-  const hashtagMatch = trimmed.match(HASHTAG_LETTER_LABEL_PATTERN);
-  if (hashtagMatch) {
-    return { letter: hashtagMatch[1].toUpperCase(), text: hashtagMatch[2] };
-  }
+  const match = trimmed.match(HASHTAG_LETTER_PART_PATTERN);
+  if (!match) return null;
+
+  const letter = match[1].toUpperCase();
+  let text = trimComplaintContinuation(match[2].replace(/^[,;\s]+/, '').replace(/[,;]+$/, '').trim());
+  if (!text || /^#\s*[A-Z]\b/i.test(text)) return null;
+  if (!isComplaintLetter(letter, text)) return null;
+  return { letter, text };
+}
+
+function parseComplaintLabelSegment(segment: string): LabeledComplaint | null {
+  const hashtag = parseHashtagComplaintPart(segment);
+  if (hashtag) return hashtag;
+
+  const trimmed = segment.trim();
+  if (!trimmed) return null;
 
   const letterMatch = trimmed.match(LETTER_LABEL_PATTERN);
   if (letterMatch) {
@@ -44,6 +69,92 @@ function parseComplaintLabelSegment(segment: string): LabeledComplaint | null {
   }
 
   return null;
+}
+
+/** Row that lists only labels, e.g. "# A, # B, # C, # D, # E, # F" with text on following lines. */
+function extractLabelOnlyRowLetters(line: string): string[] | null {
+  const matches = [...line.matchAll(/#\s*([A-Z])\b/gi)];
+  if (matches.length < 2) return null;
+
+  const remainder = line
+    .replace(/#\s*[A-Z]\b/gi, '')
+    .replace(/[,;.\s]/g, '')
+    .trim();
+  if (remainder.length > 0) return null;
+
+  return matches.map((m) => m[1].toUpperCase());
+}
+
+function collectFollowingComplaintLines(lines: string[], startIdx: number): string[] {
+  const texts: string[] = [];
+  for (let i = startIdx; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^LINE\s+OPCODE/i.test(line)) break;
+    if (/^#\s*[A-Z]\b/i.test(line)) {
+      if (extractLabelOnlyRowLetters(line)) continue;
+      if (parseHashtagComplaintPart(line.split(HASHTAG_BOUNDARY_SPLIT)[0] || line)) break;
+      break;
+    }
+    if (/^(?:ro\s*#|vin|mileage|customer\s+name|service\s+advisor)/i.test(line)) break;
+    if (isInspectionDetailLine(line)) continue;
+
+    const c = normalizeComplaintContent(line);
+    if (isValidComplaintText(c)) texts.push(c);
+  }
+  return texts;
+}
+
+function extractHashtagLabeledBlocks(section: string): Map<string, string> {
+  const byLetter = new Map<string, string>();
+  const lines = section.replace(/\r\n/g, '\n').split('\n').map((l) => l.trim()).filter(Boolean);
+
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    let line = lines[lineIdx];
+    if (/^LINE\s+OPCODE\s+TECH\s+TYPE\s+HOURS\s*$/i.test(line)) continue;
+
+    if (HEADER_ROW_PATTERN.test(line)) {
+      line = line.replace(HEADER_ROW_PATTERN, ' ').trim();
+      if (!line) continue;
+    }
+
+    const labelOnlyLetters = extractLabelOnlyRowLetters(line);
+    if (labelOnlyLetters) {
+      const texts = collectFollowingComplaintLines(lines, lineIdx + 1);
+      labelOnlyLetters.forEach((letter, idx) => {
+        if (texts[idx]) addLetterComplaint(byLetter, letter, texts[idx]);
+      });
+      continue;
+    }
+
+    const parts = line.split(HASHTAG_BOUNDARY_SPLIT).filter(Boolean);
+    for (const part of parts) {
+      const parsed = parseHashtagComplaintPart(part);
+      if (parsed) addLetterComplaint(byLetter, parsed.letter, parsed.text);
+    }
+  }
+
+  return byLetter;
+}
+
+function extractPlainLineStartComplaints(section: string): Map<string, string> {
+  const byLetter = new Map<string, string>();
+  const lines = section.replace(/\r\n/g, '\n').split('\n').map((l) => l.trim()).filter(Boolean);
+
+  for (const line of lines) {
+    if (/^#\s*[A-Z]\b/i.test(line)) continue;
+
+    if (HEADER_ROW_PATTERN.test(line)) {
+      const afterHeader = line.replace(HEADER_ROW_PATTERN, ' ').trim();
+      const parsed = parseComplaintLabelSegment(afterHeader);
+      if (parsed && !afterHeader.startsWith('#')) addLetterComplaint(byLetter, parsed.letter, parsed.text);
+      continue;
+    }
+
+    const parsed = parseComplaintLabelSegment(line);
+    if (parsed && !line.startsWith('#')) addLetterComplaint(byLetter, parsed.letter, parsed.text);
+  }
+
+  return byLetter;
 }
 
 function normalizeComplaintText(text: string): string {
@@ -94,9 +205,6 @@ function isValidComplaintText(text: string): boolean {
   return true;
 }
 
-/** Split merged OCR before the next complaint label ("# B ...", " B CHECK...", " C NOISE..."). */
-const COMPLAINT_LABEL_SPLIT = /\s+(?=(?:#\s*)?[A-Z]\s+[A-Z][A-Za-z])/;
-
 function isComplaintLetter(letter: string, text: string): boolean {
   if (!/^[A-Z]$/.test(letter)) return false;
   return isValidComplaintText(text);
@@ -123,27 +231,22 @@ function addLetterComplaint(byLetter: Map<string, string>, letter: string, text:
   }
 }
 
-/** Build letter → complaint map from OCR/RO text (supports "A ...", "# A ...", "A. ..."). */
+/** Build letter → complaint map from OCR/RO text (supports "# A ...", "# A, # B", "A ..."). */
 export function extractLetterLabeledComplaintMap(text: string): Map<string, string> {
   const byLetter = new Map<string, string>();
   if (!text || text.trim().length < 4) return byLetter;
 
   const section = getComplaintSection(text.replace(/\r\n/g, '\n'));
-  const lines = section.split(/\n/).map((l) => l.trim()).filter(Boolean);
+  const explicitHashtagLabels = collectExplicitHashtagLabels(text);
 
-  for (const line of lines) {
-    if (/^LINE\s+OPCODE\s+TECH\s+TYPE\s+HOURS\s*$/i.test(line)) continue;
+  for (const [letter, value] of extractHashtagLabeledBlocks(section)) {
+    addLetterComplaint(byLetter, letter, value);
+  }
 
-    let chunk = line;
-    if (HEADER_ROW_PATTERN.test(line)) {
-      chunk = line.replace(HEADER_ROW_PATTERN, ' ').trim();
-      if (!chunk) continue;
-    }
-
-    const segments = chunk.split(COMPLAINT_LABEL_SPLIT).filter(Boolean);
-    for (const segment of segments) {
-      const parsed = parseComplaintLabelSegment(segment);
-      if (parsed) addLetterComplaint(byLetter, parsed.letter, parsed.text);
+  // When the RO uses hashtag labels, ignore plain "E. ..." lines (often Grok/OCR fragments).
+  if (explicitHashtagLabels.size === 0) {
+    for (const [letter, value] of extractPlainLineStartComplaints(section)) {
+      addLetterComplaint(byLetter, letter, value);
     }
   }
 
@@ -378,15 +481,21 @@ export function recoverComplaintsWithLabelsFromText(
 ): RecoveredComplaints {
   const letterFromRawMap = extractLetterLabeledComplaintMap(text);
   const structuredLetters = extractStructuredLetterComplaints(text);
+  const explicitHashtagLabels = collectExplicitHashtagLabels(text);
   const byLetter = new Map<string, string>();
 
-  for (const [letter, value] of structuredLetters) {
+  // OCR/raw hashtag and line-start labels are authoritative.
+  for (const [letter, value] of letterFromRawMap) {
     addLetterComplaint(byLetter, letter, value);
   }
 
-  // Letter-labeled raw/OCR lines override Grok structured (fixes skipped Line A).
-  for (const [letter, value] of letterFromRawMap) {
-    addLetterComplaint(byLetter, letter, value);
+  // Grok structured output only fills gaps when the RO does not use hashtag labels.
+  if (explicitHashtagLabels.size === 0) {
+    for (const [letter, value] of structuredLetters) {
+      if (byLetter.has(letter)) continue;
+      if (!letterAppearsAsComplaintLabel(text, letter)) continue;
+      addLetterComplaint(byLetter, letter, value);
+    }
   }
 
   // Grok skipped A but labeled continuation detail as B (e.g. "B. RISI RHODE ISLAND...").

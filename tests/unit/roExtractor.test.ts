@@ -146,6 +146,76 @@ C NOISE FROM REAR`;
     assert.deepEqual(complaints, ['RHODE ISLAND STATE INSPECTION', 'CHECK ENGINE LIGHT ON']);
   });
 
+  test('does not split RHODE ISLAND STATE INSPECTION into false E I L N letters', () => {
+    const text = `LINE OPCODE TECH TYPE HOURS
+# A RHODE ISLAND STATE INSPECTION
+# B CHECK ENGINE LIGHT ON
+# C NOISE FROM REAR`;
+    const labeled = extractLetterLabeledComplaintsWithLabels(text);
+    assert.deepEqual(
+      labeled.map((item) => item.letter),
+      ['A', 'B', 'C']
+    );
+    assert.equal(labeled[0].text, 'RHODE ISLAND STATE INSPECTION');
+    assert.ok(!labeled.some((item) => ['E', 'I', 'L', 'N'].includes(item.letter)));
+  });
+
+  test('extracts A-F from comma-separated hashtag label row with text on following lines', () => {
+    const text = `LINE OPCODE TECH TYPE HOURS
+# A, # B, # C, # D, # E, # F
+RHODE ISLAND STATE INSPECTION
+CHECK ENGINE LIGHT ON
+NOISE FROM REAR SUSPENSION
+BRAKE PULSATION AT STOP
+VIBRATION AT HIGHWAY SPEED
+SUNROOF WIND NOISE`;
+    const labeled = extractLetterLabeledComplaintsWithLabels(text);
+    assert.deepEqual(
+      labeled.map((item) => item.letter),
+      ['A', 'B', 'C', 'D', 'E', 'F']
+    );
+    assert.equal(labeled[0].text, 'RHODE ISLAND STATE INSPECTION');
+    assert.equal(labeled[5].text, 'SUNROOF WIND NOISE');
+  });
+
+  test('extracts inline comma-separated hashtag complaints on one line', () => {
+    const text =
+      '# A, RHODE ISLAND STATE INSPECTION, # B, CHECK ENGINE LIGHT ON, # C, BRAKE NOISE FROM FRONT';
+    const labeled = extractLetterLabeledComplaintsWithLabels(text);
+    assert.deepEqual(
+      labeled.map((item) => item.letter),
+      ['A', 'B', 'C']
+    );
+    assert.equal(labeled[1].text, 'CHECK ENGINE LIGHT ON');
+  });
+
+  test('recovers A-F across two pages and rejects Grok hallucinated letter fragments', () => {
+    const ocrText = `=== PAGE 1 ===
+LINE OPCODE TECH TYPE HOURS
+# A, # B, # C
+RHODE ISLAND STATE INSPECTION
+CHECK ENGINE LIGHT ON
+NOISE FROM REAR
+
+=== PAGE 2 ===
+# D, # E, # F
+BRAKE PULSATION
+VIBRATION AT HIGHWAY SPEED
+SUNROOF WIND NOISE`;
+
+    const grokGarbage = `Customer Complaints:
+A. RHODE ISLAND STATE INSPECTION
+E. ISLAND STATE
+I. STATE INSPECTION
+L. INSPECTION
+N. SPECTION`;
+
+    const recovered = recoverComplaintsWithLabelsFromText(`${grokGarbage}\n${ocrText}`);
+    assert.deepEqual(recovered.labels, ['A', 'B', 'C', 'D', 'E', 'F']);
+    assert.equal(recovered.complaints.length, 6);
+    assert.ok(!recovered.complaints.some((c) => /^(ISLAND|STATE|INSPECTION|SPECTION)$/i.test(c)));
+  });
+
   test('parseStructuredROText preserves E/F labels from hashtag OCR', () => {
     const text = `LINE OPCODE TECH TYPE HOURS
 # A STATE INSPECTION
