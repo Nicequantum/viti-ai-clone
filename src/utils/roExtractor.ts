@@ -75,65 +75,143 @@ function parseComplaintLabelSegment(segment: string): LabeledComplaint | null {
   return null;
 }
 
-/** Complaint text on lines below a label-only row (# A alone, then text underneath). */
-function collectTextUntilNextHashtagLabel(lines: string[], startIdx: number): string {
-  const parts: string[] = [];
-  for (let i = startIdx; i < lines.length; i++) {
-    const line = lines[i];
-    if (/^#\s*[A-Z]\b/i.test(line)) break;
-    if (/^LINE\s+OPCODE/i.test(line)) break;
-    if (/^(?:ro\s*#|vin|mileage|customer\s+name|service\s+advisor)/i.test(line)) break;
-    if (isInspectionDetailLine(line)) continue;
+type ComplaintTimelineEntry =
+  | { kind: 'label'; letter: string }
+  | { kind: 'text'; text: string };
 
-    const c = normalizeComplaintContent(line);
-    if (isValidComplaintText(c)) parts.push(c);
+/** Reject VIN fragments, form codes, and OCR noise misread as complaints. */
+export function isPlausibleComplaintText(text: string): boolean {
+  if (!isValidComplaintText(text)) return false;
+  const trimmed = normalizeComplaintText(text);
+  const compact = trimmed.replace(/\s/g, '');
+
+  if (/^[_=+\-/*\\]/.test(trimmed)) return false;
+  if (/^#/.test(trimmed)) return false;
+  if (/[=,].*[=,]/.test(trimmed) || (/[=,]/.test(trimmed) && !/\s{2,}/.test(trimmed) && trimmed.length < 20)) {
+    return false;
   }
-  return parts.join(' ');
+  if (/^[A-Z0-9_\-]{10,}$/i.test(compact) && /[\d_\-]/.test(compact)) return false;
+  if (/\b[A-HJ-NPR-Z0-9]{11,17}\b/i.test(trimmed) && !/\s/.test(trimmed)) return false;
+  if (/\d{5,}/.test(trimmed) && trimmed.split(/\s+/).length < 3) return false;
+
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  if (words.length === 1 && trimmed.length < 8) return false;
+  if (!words.some((word) => /[A-Za-z]{4,}/.test(word))) return false;
+  if (words.length >= 3 && !words.some((word) => word.length >= 7)) {
+    const avgLen = words.reduce((sum, word) => sum + word.length, 0) / words.length;
+    if (avgLen < 4) return false;
+  }
+
+  return true;
 }
 
-/**
- * Primary extractor: vertical column of # A / # B / # C labels (one per line, no commas).
- * Also handles label + text on the same line, and OCR-merged lines.
- */
-function extractHashtagLabeledBlocks(section: string): Map<string, string> {
-  const byLetter = new Map<string, string>();
+function isHashtagLabelOnlyLine(line: string): string | null {
+  const match = line.match(HASHTAG_LABEL_ONLY_LINE);
+  return match ? match[1].toUpperCase() : null;
+}
+
+function preprocessComplaintSectionLines(section: string): string[] {
   const lines = section.replace(/\r\n/g, '\n').split('\n').map((l) => l.trim()).filter(Boolean);
+  const out: string[] = [];
 
-  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-    let line = lines[lineIdx];
+  for (let line of lines) {
     if (/^LINE\s+OPCODE\s+TECH\s+TYPE\s+HOURS\s*$/i.test(line)) continue;
-
     if (HEADER_ROW_PATTERN.test(line)) {
       line = line.replace(HEADER_ROW_PATTERN, ' ').trim();
       if (!line) continue;
     }
-
-    const hashtagCount = (line.match(/#\s*[A-Z]\b/gi) || []).length;
-    if (hashtagCount > 1) {
-      const parts = line.split(HASHTAG_BOUNDARY_SPLIT).filter(Boolean);
-      for (const part of parts) {
-        const parsed = parseHashtagComplaintPart(part);
-        if (parsed) addLetterComplaint(byLetter, parsed.letter, parsed.text);
-      }
+    if ((line.match(/#\s*[A-Z]\b/gi) || []).length > 1) {
+      out.push(...line.split(HASHTAG_BOUNDARY_SPLIT).map((part) => part.trim()).filter(Boolean));
       continue;
     }
+    out.push(line);
+  }
 
-    const labelOnly = line.match(HASHTAG_LABEL_ONLY_LINE);
+  return out;
+}
+
+function buildComplaintTimeline(lines: string[]): ComplaintTimelineEntry[] {
+  const timeline: ComplaintTimelineEntry[] = [];
+
+  for (const line of lines) {
+    const labelOnly = isHashtagLabelOnlyLine(line);
     if (labelOnly) {
-      const letter = labelOnly[1].toUpperCase();
-      const text = collectTextUntilNextHashtagLabel(lines, lineIdx + 1);
-      if (text) addLetterComplaint(byLetter, letter, text);
+      timeline.push({ kind: 'label', letter: labelOnly });
       continue;
     }
 
-    const labelWithText = line.match(HASHTAG_LABEL_WITH_TEXT_LINE);
-    if (labelWithText) {
-      const letter = labelWithText[1].toUpperCase();
-      const text = trimComplaintContinuation(labelWithText[2].trim());
-      if (isComplaintLetter(letter, text)) addLetterComplaint(byLetter, letter, text);
+    const inline = line.match(HASHTAG_LABEL_WITH_TEXT_LINE);
+    if (inline) {
+      timeline.push({ kind: 'label', letter: inline[1].toUpperCase() });
+      const text = trimComplaintContinuation(inline[2].trim());
+      if (text) timeline.push({ kind: 'text', text });
+      continue;
+    }
+
+    if (isInspectionDetailLine(line)) continue;
+    const content = normalizeComplaintContent(line);
+    if (isValidComplaintText(content)) timeline.push({ kind: 'text', text: content });
+  }
+
+  return timeline;
+}
+
+/**
+ * Pair labels with complaint text for dealership column layout:
+ * - Interleaved: # A → text → # B → text
+ * - Label block: # A, # B, # C (stacked) → text lines below in order
+ */
+function pairComplaintTimeline(timeline: ComplaintTimelineEntry[]): LabeledComplaint[] {
+  const results: LabeledComplaint[] = [];
+  let index = 0;
+
+  while (index < timeline.length) {
+    if (timeline[index].kind !== 'label') {
+      index++;
+      continue;
+    }
+
+    const labels: string[] = [];
+    while (index < timeline.length && timeline[index].kind === 'label') {
+      const entry = timeline[index] as Extract<ComplaintTimelineEntry, { kind: 'label' }>;
+      labels.push(entry.letter);
+      index++;
+    }
+
+    const texts: string[] = [];
+    while (index < timeline.length && timeline[index].kind === 'text') {
+      const entry = timeline[index] as Extract<ComplaintTimelineEntry, { kind: 'text' }>;
+      texts.push(entry.text);
+      index++;
+    }
+
+    const plausibleTexts = texts.filter((value) => isPlausibleComplaintText(value));
+
+    if (labels.length === 1) {
+      results.push({ letter: labels[0], text: plausibleTexts.join(' ').trim() });
+    } else {
+      labels.forEach((letter, idx) => {
+        results.push({ letter, text: plausibleTexts[idx] || '' });
+      });
     }
   }
 
+  return results;
+}
+
+/** Ordered hashtag complaints from OCR — preserves document order (not alphabetical). */
+export function extractOrderedHashtagComplaints(text: string): LabeledComplaint[] {
+  if (!text?.trim()) return [];
+  const section = getComplaintSection(text.replace(/\r\n/g, '\n'));
+  const lines = preprocessComplaintSectionLines(section);
+  return pairComplaintTimeline(buildComplaintTimeline(lines));
+}
+
+function extractHashtagLabeledBlocks(section: string): Map<string, string> {
+  const byLetter = new Map<string, string>();
+  for (const { letter, text } of extractOrderedHashtagComplaints(section)) {
+    if (text && isPlausibleComplaintText(text)) addLetterComplaint(byLetter, letter, text);
+  }
   return byLetter;
 }
 
@@ -208,7 +286,7 @@ function isValidComplaintText(text: string): boolean {
 
 function isComplaintLetter(letter: string, text: string): boolean {
   if (!/^[A-Z]$/.test(letter)) return false;
-  return isValidComplaintText(text);
+  return isPlausibleComplaintText(text);
 }
 
 function getComplaintSection(text: string): string {
@@ -232,7 +310,7 @@ function addLetterComplaint(byLetter: Map<string, string>, letter: string, text:
   }
 }
 
-/** Build letter → complaint map from OCR/RO text (supports "# A ...", "# A, # B", "A ..."). */
+/** Build letter → complaint map from OCR/RO text (supports vertical "# A" / "# B" column). */
 export function extractLetterLabeledComplaintMap(text: string): Map<string, string> {
   const byLetter = new Map<string, string>();
   if (!text || text.trim().length < 4) return byLetter;
@@ -244,7 +322,6 @@ export function extractLetterLabeledComplaintMap(text: string): Map<string, stri
     addLetterComplaint(byLetter, letter, value);
   }
 
-  // When the RO uses hashtag labels, ignore plain "E. ..." lines (often Grok/OCR fragments).
   if (explicitHashtagLabels.size === 0) {
     for (const [letter, value] of extractPlainLineStartComplaints(section)) {
       addLetterComplaint(byLetter, letter, value);
@@ -256,17 +333,85 @@ export function extractLetterLabeledComplaintMap(text: string): Map<string, stri
 
 /** Primary extractor for real-world RO complaint lines: "A RHODE ISLAND STATE INSPECTION" / "# A ..." */
 export function extractLetterLabeledComplaints(text: string): string[] {
-  return sortedLabeledComplaints(extractLetterLabeledComplaintMap(text)).map((item) => item.text);
+  const byLetter = extractLetterLabeledComplaintMap(text);
+  return labeledComplaintsInDocumentOrder(text, byLetter).map((item) => item.text);
 }
 
 export function extractLetterLabeledComplaintsWithLabels(text: string): LabeledComplaint[] {
-  return sortedLabeledComplaints(extractLetterLabeledComplaintMap(text));
+  const byLetter = extractLetterLabeledComplaintMap(text);
+  return labeledComplaintsInDocumentOrder(text, byLetter);
 }
 
 function sortedLabeledComplaints(byLetter: Map<string, string>): LabeledComplaint[] {
   return [...byLetter.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([letter, text]) => ({ letter, text }));
+}
+
+function labeledComplaintsInDocumentOrder(text: string, byLetter: Map<string, string>): LabeledComplaint[] {
+  const ordered = extractOrderedHashtagComplaints(text);
+  if (ordered.length === 0) return sortedLabeledComplaints(byLetter);
+
+  const results: LabeledComplaint[] = [];
+  for (const { letter, text: inlineText } of ordered) {
+    const mapped = byLetter.get(letter);
+    const picked = mapped || (inlineText && isPlausibleComplaintText(inlineText) ? inlineText : '');
+    if (picked) results.push({ letter, text: picked });
+  }
+
+  if (results.length > 0) return results;
+  return sortedLabeledComplaints(byLetter);
+}
+
+function buildGrokComplaintMap(primary: StructuredROExtraction): Map<string, string> {
+  const map = new Map<string, string>();
+  if (primary.complaintLabels?.length && primary.complaints?.length) {
+    primary.complaintLabels.forEach((label, index) => {
+      const text = primary.complaints[index];
+      if (text && isPlausibleComplaintText(text)) {
+        map.set(label.toUpperCase(), text);
+      }
+    });
+    if (map.size > 0) return map;
+  }
+
+  primary.complaints.forEach((complaint, index) => {
+    if (isPlausibleComplaintText(complaint)) {
+      map.set(String.fromCharCode(65 + index), complaint);
+    }
+  });
+  return map;
+}
+
+function mergeComplaintsWithGrokFallback(
+  ocrText: string,
+  grokPrimary: StructuredROExtraction
+): RecoveredComplaints {
+  const grokMap = buildGrokComplaintMap(grokPrimary);
+  const ordered = extractOrderedHashtagComplaints(ocrText);
+  const hashtagLabelCount = ordered.filter((entry) => entry.letter).length;
+
+  if (hashtagLabelCount >= 2) {
+    const complaints: string[] = [];
+    const labels: string[] = [];
+
+    for (const { letter, text: ocrInline } of ordered) {
+      const ocrTextCandidate =
+        ocrInline && isPlausibleComplaintText(ocrInline) ? ocrInline : '';
+      const grokText = grokMap.get(letter) || '';
+      const picked = ocrTextCandidate || (isPlausibleComplaintText(grokText) ? grokText : '');
+      if (picked) {
+        labels.push(letter);
+        complaints.push(picked);
+      }
+    }
+
+    if (complaints.length > 0) {
+      return { complaints, labels };
+    }
+  }
+
+  return recoverComplaintsWithLabelsFromText(ocrText, grokPrimary.complaints);
 }
 
 export function labeledComplaintsToArrays(
@@ -395,14 +540,15 @@ function mergeVehicleFields(primary: VehicleInfo, supplement: VehicleInfo): Vehi
   };
 }
 
-/** Merge Grok vision output with on-device OCR (raw OCR text wins for letter-labeled complaints). */
+/** Merge Grok vision output with on-device OCR (labels from OCR column, text from best source). */
 export function mergeROExtractions(
   primary: StructuredROExtraction,
   supplement: StructuredROExtraction,
   supplementRawText = ''
 ): StructuredROExtraction {
-  const grokComplaints = mergeComplaintLists(primary.complaints, supplement.complaints);
-  const recovered = recoverComplaintsWithLabelsFromText(supplementRawText, grokComplaints);
+  const recovered = supplementRawText.trim()
+    ? mergeComplaintsWithGrokFallback(supplementRawText, primary)
+    : recoverComplaintsWithLabelsFromText('', primary.complaints);
   const complaints = sanitizeComplaints(recovered.complaints);
   const complaintLabels =
     recovered.labels && recovered.labels.length === complaints.length ? recovered.labels : undefined;
@@ -527,10 +673,11 @@ export function recoverComplaintsWithLabelsFromText(
   }
 
   if (byLetter.size > 0) {
+    const ordered = labeledComplaintsInDocumentOrder(text, byLetter);
     const seen = new Set<string>();
     const complaints: string[] = [];
     const labels: string[] = [];
-    for (const [letter, value] of [...byLetter.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    for (const { letter, text: value } of ordered) {
       const key = value.toLowerCase();
       if (!seen.has(key)) {
         seen.add(key);
@@ -810,7 +957,7 @@ export function extractRoNumberFromText(text: string): string {
 }
 
 export function sanitizeComplaints(complaints: string[]): string[] {
-  return complaints.filter((c) => isValidComplaintText(c));
+  return complaints.filter((c) => isPlausibleComplaintText(c));
 }
 
 export function sanitizeVehicle(vehicle: VehicleInfo): VehicleInfo {

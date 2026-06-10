@@ -12,22 +12,23 @@ CUSTOMER COMPLAINTS (HIGHEST PRIORITY — DO NOT SKIP LINE A):
 Real dealership ROs use minimal formatting. Complaints are NOT always preceded by "Customer states" or colons.
 
 CRITICAL FORMAT — vertical column of hashtag labels (NO commas on the RO):
-The dealership prints complaint labels in a single column, one per line, stacked vertically:
+The dealership prints complaint labels in a single column, one per line, stacked vertically down the page:
 
     # A
-    (complaint text for A — same line or lines below)
     # B
-    (complaint text for B)
     # C
     # D
     # E
     # F
 
-Each label is exactly: hashtag + space + single capital letter (# A, # B, # C …).
-There are NO commas between labels. Do NOT insert or expect commas.
-Labels are NOT on one horizontal row — they run straight down the page.
+Each label is exactly: hashtag + space + single capital letter. There are NO commas between labels.
 
-The complaint text may appear on the same line after the label (# A RHODE ISLAND STATE INSPECTION) OR on the line(s) immediately below a label-only row (# A on one line, then the complaint text underneath).
+The complaint TEXT is usually in the column beside these labels (to the right), or directly after each label on the same line:
+    # A RHODE ISLAND STATE INSPECTION
+    # B CHECK ENGINE LIGHT ON
+
+Read the actual complaint sentence beside each # letter. Do NOT copy VIN fragments, form codes, barcodes, or random OCR garbage.
+Do NOT invent letters from words inside complaint text (e.g. "RHODE ISLAND" does NOT create lines E, I, L, N).
 
 Legacy (no hashtag): A RHODE ISLAND STATE INSPECTION / B CHECK ENGINE LIGHT ON
 

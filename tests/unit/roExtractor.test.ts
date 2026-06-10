@@ -5,6 +5,7 @@ import {
   extractLetterLabeledComplaints,
   extractLetterLabeledComplaintsWithLabels,
   extractServiceAdvisorFromText,
+  isPlausibleComplaintText,
   mergeROExtractions,
   parseStructuredROText,
   recoverComplaintsWithLabelsFromText,
@@ -237,6 +238,66 @@ N. SPECTION`;
     const parsed = parseStructuredROText(text);
     assert.deepEqual(parsed.complaintLabels, ['A', 'B', 'C', 'E', 'F']);
     assert.equal(parsed.complaints.length, 5);
+  });
+
+  test('rejects VIN fragments and OCR garbage misread as complaints', () => {
+    assert.equal(isPlausibleComplaintText('_LI23P5491318'), false);
+    assert.equal(isPlausibleComplaintText('SHEETE'), false);
+    assert.equal(isPlausibleComplaintText('=EA,-MO'), false);
+    assert.equal(isPlausibleComplaintText('Thai ENIIA Ts Rees'), false); // short gibberish tokens
+    assert.equal(isPlausibleComplaintText('RHODE ISLAND STATE INSPECTION'), true);
+  });
+
+  test('pairs stacked label column with complaint text skipping form junk lines', () => {
+    const text = `LINE OPCODE TECH TYPE HOURS
+# A
+# B
+# C
+# D
+# E
+# F
+_LI23P5491318
+SHEETE
+RHODE ISLAND STATE INSPECTION
+CHECK ENGINE LIGHT ON
+NOISE FROM REAR SUSPENSION
+BRAKE PULSATION AT STOP
+VIBRATION AT HIGHWAY SPEED
+SUNROOF WIND NOISE`;
+    const labeled = extractLetterLabeledComplaintsWithLabels(text);
+    assert.deepEqual(
+      labeled.map((item) => item.letter),
+      ['A', 'B', 'C', 'D', 'E', 'F']
+    );
+    assert.equal(labeled[0].text, 'RHODE ISLAND STATE INSPECTION');
+    assert.equal(labeled[5].text, 'SUNROOF WIND NOISE');
+  });
+
+  test('mergeROExtractions uses Grok vision text when OCR pairs labels with junk', () => {
+    const ocrText = `LINE OPCODE TECH TYPE HOURS
+# A
+# B
+# C
+# D
+# E
+# F
+_LI23P5491318
+SHEETE
+=EA,-MO`;
+
+    const grokExtracted = parseStructuredROText(`Customer Complaints:
+A. RHODE ISLAND STATE INSPECTION
+B. CHECK ENGINE LIGHT ON
+C. NOISE FROM REAR SUSPENSION
+D. BRAKE PULSATION AT STOP
+E. VIBRATION AT HIGHWAY SPEED
+F. SUNROOF WIND NOISE`);
+
+    const merged = mergeROExtractions(grokExtracted, parseStructuredROText(ocrText), ocrText);
+    assert.deepEqual(merged.complaintLabels, ['A', 'B', 'C', 'D', 'E', 'F']);
+    assert.equal(merged.complaints[0], 'RHODE ISLAND STATE INSPECTION');
+    assert.equal(merged.complaints[5], 'SUNROOF WIND NOISE');
+    assert.ok(!merged.complaints.some((c) => c.includes('_LI23')));
   });
 
   test('mergeROExtractions prefers non-empty service advisor name', () => {
