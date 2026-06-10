@@ -85,7 +85,7 @@ export async function extractROFromImages(imageDataUrls: string[]) {
         content: [{ type: 'text', text: RO_EXTRACTION_PROMPT }, ...imageContents],
       },
     ],
-    { temperature: 0.05, max_tokens: 1000, timeoutMs: 90_000 }
+    { temperature: 0.05, max_tokens: 1800, timeoutMs: 120_000 }
   );
   return parseStructuredROText(extractedText);
 }

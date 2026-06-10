@@ -6,7 +6,9 @@ function defaultRepairLine(complaint?: string, lineNumber = 1, label?: string): 
   const prefix = label ? `${label}. ` : '';
   const description = concern
     ? `${prefix}${concern}`.slice(0, 72)
-    : 'Enter repair description';
+    : label
+      ? `${label}. (not extracted — tap to edit)`
+      : 'Enter repair description';
   return {
     id: `line-${Date.now()}-${lineNumber}`,
     lineNumber,
@@ -36,7 +38,9 @@ export function syncRepairLinesWithComplaints(
     const prior = existingLines[index];
     const concern = complaint || '';
     const prefix = `${label}. `;
-    const description = concern ? `${prefix}${concern}`.slice(0, 72) : 'Enter repair description';
+    const description = concern
+      ? `${prefix}${concern}`.slice(0, 72)
+      : `${label}. (not extracted — tap to edit)`;
 
     if (prior) {
       const concernChanged = prior.customerConcern !== concern;

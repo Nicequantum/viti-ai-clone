@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
-import { preprocessImageForOCR, runOCR } from '@/services/ocr';
+import { preprocessImageForOCR, runMultiPassOCR, runOCR } from '@/services/ocr';
 import type { AppView, ExtractedData, ImageAttachment, PendingImage, RepairLine, RepairOrder } from '@/types';
 import { emptyExtractedData, mergeExtracted, parseDiagnosticText } from '@/utils/diagnosticParser';
 import { getSuggestions } from '@/utils/mercedesKb';
@@ -17,6 +17,7 @@ import {
   extractCustomerName,
   extractRoNumberFromText,
   extractVehicleDetails,
+  finalizeLabeledComplaints,
   mergeROExtractions,
   parseStructuredROText,
   sanitizeComplaints,
@@ -168,11 +169,12 @@ export function useRepairOrders({
       serviceAdvisorName?: string;
     }) => {
       try {
-        const complaints = sanitizeComplaints(extracted.complaints || []);
-        const complaintLabels =
-          extracted.complaintLabels && extracted.complaintLabels.length === complaints.length
-            ? extracted.complaintLabels
-            : undefined;
+        const finalized = finalizeLabeledComplaints(
+          extracted.complaints || [],
+          extracted.complaintLabels
+        );
+        const complaints = finalized.complaints;
+        const complaintLabels = finalized.labels;
         const { repairOrder } = await api.createRepairOrder({
           fromExtraction: true,
           roNumber: extracted.roNumber || `R-${Date.now().toString().slice(-6)}`,
@@ -221,10 +223,11 @@ export function useRepairOrders({
           for (let i = 0; i < images.length; i++) {
             if (scanCancelledRef.current) return '';
             const img = images[i];
-            setScanStatusMessage(`Reading page ${i + 1} of ${images.length} on device…`);
+            setScanStatusMessage(
+              `Reading page ${i + 1} of ${images.length} (multi-pass OCR for accuracy)…`
+            );
             setOcrProgress(Math.round(30 + (i / images.length) * 15));
-            const preprocessed = await preprocessImageForOCR(img.file, 'full');
-            const text = await runOCR(preprocessed, (p) =>
+            const text = await runMultiPassOCR(img.file, (p) =>
               setOcrProgress(Math.round(45 + (i / images.length) * 35 + (p / images.length) * 35))
             );
             combinedText += `\n\n=== PAGE ${i + 1} ===\n` + text;

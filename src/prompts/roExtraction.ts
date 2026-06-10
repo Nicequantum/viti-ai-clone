@@ -1,4 +1,4 @@
-export const RO_EXTRACTION_PROMPT = `Use OCR to carefully analyze ALL provided repair order image(s). Extract vehicle header fields from the top section AND extract EVERY customer complaint line from the complaint/labor section (often labeled LINE OPCODE TECH TYPE HOURS).
+export const RO_EXTRACTION_PROMPT = `Use OCR to carefully analyze ALL provided repair order image(s). Extract vehicle header fields from the top section AND extract EVERY customer complaint line from the complaint/labor section.
 
 VEHICLE FIELDS (top header):
 - RO Number: top center (near "RO #", "Repair Order", "Work Order")
@@ -8,11 +8,13 @@ VEHICLE FIELDS (top header):
 - VIN: exactly 17 characters
 - Mileage IN: from MILEAGE IN/OUT or odometer (numbers only)
 
-CUSTOMER COMPLAINTS (HIGHEST PRIORITY — DO NOT SKIP LINE A):
-Real dealership ROs use minimal formatting. Complaints are NOT always preceded by "Customer states" or colons.
+CUSTOMER COMPLAINTS (HIGHEST PRIORITY — EXTRACT EVERY # A THROUGH # F):
+The complaint block starts immediately AFTER the header row that reads:
+  LINE OP CODE TECH TYPE DESCRIPTION / INSTRUCTIONS
+(or close variants: LINE OPCODE TECH TYPE HOURS, LINE OP CODE TECH TYPE DESCRIPTION)
 
 CRITICAL FORMAT — vertical column of hashtag labels (NO commas on the RO):
-The dealership prints complaint labels in a single column, one per line, stacked vertically down the page:
+Immediately below that header, the dealership prints complaint labels in a column:
 
     # A
     # B
@@ -21,26 +23,24 @@ The dealership prints complaint labels in a single column, one per line, stacked
     # E
     # F
 
-Each label is exactly: hashtag + space + single capital letter. There are NO commas between labels.
+Each label is: hashtag + space + single capital letter (A through F). NO commas between labels.
 
-The complaint TEXT is usually in the column beside these labels (to the right), or directly after each label on the same line:
+The complaint TEXT is beside these labels (to the right) OR on the same line:
     # A RHODE ISLAND STATE INSPECTION
     # B CHECK ENGINE LIGHT ON
 
-Read the actual complaint sentence beside each # letter. Do NOT copy VIN fragments, form codes, barcodes, or random OCR garbage.
-Do NOT invent letters from words inside complaint text (e.g. "RHODE ISLAND" does NOT create lines E, I, L, N).
+MULTI-PAGE RULES:
+- Search ALL pages/images. Complaints often continue on page 2+.
+- Page 2 may begin with leftover/continuation text from the previous complaint — that text belongs to the PRIOR letter (e.g. end of C), NOT a new line.
+- Still extract every # letter printed on later pages (D, E, F, etc.).
 
-Legacy (no hashtag): A RHODE ISLAND STATE INSPECTION / B CHECK ENGINE LIGHT ON
-
-Rules:
-1. Find the complaint section (header row often reads "LINE OPCODE TECH TYPE HOURS" or similar). Search ALL pages.
-2. Walk down the column and extract EVERY label # A, # B, # C, # D, # E, # F (only letters actually printed).
-3. Line A is the FIRST label in the column — NEVER skip Line A.
-4. Pair each label with its complaint text. Do NOT invent letters from words inside complaint text (e.g. "RHODE ISLAND" does NOT create lines E, I, L, N).
-5. Preserve EXACT letter labels from the RO in order down the column.
-6. Lines WITHOUT a leading letter (e.g. "RISI RHODE ISLAND STATE INSPECTION", "619 CDEF", "130132 PASSED") are continuation/inspection detail — attach mentally to the prior lettered line but output ONLY the lettered complaint lines A, B, C…
-7. Also capture complaints after phrases: "Customer states", "Customer complaint", "C/S", "Concern", "state inspection".
-8. Search ALL pages/images. If truly none, output exactly "None listed."
+INCLUDE ALL LINES — DO NOT SKIP:
+- Extract EVERY printed label # A, # B, # C, # D, # E, # F even if the text is short, "Quality Control", a placeholder, or hard to read.
+- Line A is ALWAYS the first # A in the column — NEVER skip Line A.
+- Include QC / shop lines verbatim. The technician will delete unneeded lines.
+- Do NOT invent letters from words inside complaint text (e.g. "RHODE ISLAND" does NOT create lines E, I, L, N).
+- Lines WITHOUT a leading # letter (e.g. "RISI ...", "619 CDEF", "130132 PASSED") are inspection detail — attach to the prior letter mentally; output only lettered lines A–F.
+- Also capture text after "Customer states...", "C/S", "Concern" when paired with a # letter.
 
 Output ONLY this exact format:
 
@@ -53,9 +53,11 @@ Model: [value]
 VIN: [exact 17 char]
 Mileage IN: [numbers only]
 Customer Complaints:
-A. [exact text after A — include full complaint even if ALL CAPS]
-B. [exact text]
-C. [exact text]
-...
+A. [exact text for # A]
+B. [exact text for # B]
+C. [exact text for # C]
+D. [exact text for # D]
+E. [exact text for # E]
+F. [exact text for # F]
 
-Use "A." prefix in output even if the RO shows "A " without a period. Be extremely precise on VIN (fix O/0 I/1), mileage, and RO number.`;
+Output only letters actually printed on the RO (skip letters not present). Use "A." prefix in output even if the RO shows "# A" without a period. Be extremely precise on VIN (fix O/0 I/1), mileage, and RO number.`;

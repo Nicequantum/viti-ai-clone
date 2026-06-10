@@ -350,6 +350,67 @@ B. RHODE ISLAND STATE INSPECTION`);
     assert.equal(merged.complaints[1], 'RHODE ISLAND STATE INSPECTION');
   });
 
+  test('extracts complaints after DESCRIPTION / INSTRUCTIONS header', () => {
+    const text = `LINE OP CODE TECH TYPE DESCRIPTION / INSTRUCTIONS
+# A
+RHODE ISLAND STATE INSPECTION
+# B
+CHECK ENGINE LIGHT ON
+# C
+QUALITY CONTROL`;
+    const labeled = extractLetterLabeledComplaintsWithLabels(text);
+    assert.deepEqual(
+      labeled.map((item) => item.letter),
+      ['A', 'B', 'C']
+    );
+    assert.equal(labeled[2].text, 'QUALITY CONTROL');
+  });
+
+  test('page 2 leftover text continues prior complaint before next hashtag label', () => {
+    const text = `LINE OP CODE TECH TYPE DESCRIPTION / INSTRUCTIONS
+# A
+STATE INSPECTION
+# B
+CHECK ENGINE LIGHT ON
+# C
+NOISE FROM REAR WHINE
+
+=== PAGE 2 ===
+WHEN TURNING LEFT
+# D
+BRAKE PULSATION
+# E
+QUALITY CONTROL
+# F
+SUNROOF WIND NOISE`;
+
+    const recovered = recoverComplaintsWithLabelsFromText(text);
+    assert.deepEqual(recovered.labels, ['A', 'B', 'C', 'D', 'E', 'F']);
+    assert.ok(recovered.complaints[2].includes('NOISE FROM REAR WHINE'));
+    assert.ok(recovered.complaints[2].includes('WHEN TURNING LEFT'));
+    assert.equal(recovered.complaints[4], 'QUALITY CONTROL');
+    assert.equal(recovered.complaints[5], 'SUNROOF WIND NOISE');
+  });
+
+  test('mergeROExtractions keeps every hashtag label even when text is short', () => {
+    const ocrText = `LINE OP CODE TECH TYPE DESCRIPTION / INSTRUCTIONS
+# A
+RHODE ISLAND STATE INSPECTION
+# B
+QC
+# C
+CHECK ENGINE LIGHT ON`;
+
+    const grokExtracted = parseStructuredROText(`Customer Complaints:
+A. RHODE ISLAND STATE INSPECTION
+B. QUALITY CONTROL
+C. CHECK ENGINE LIGHT ON`);
+
+    const merged = mergeROExtractions(grokExtracted, parseStructuredROText(ocrText), ocrText);
+    assert.deepEqual(merged.complaintLabels, ['A', 'B', 'C']);
+    assert.ok(['QC', 'QUALITY CONTROL'].includes(merged.complaints[1]));
+  });
+
   test('mergeROExtractions prefers non-empty service advisor name', () => {
     const grokParsed = {
       ...parseStructuredROText(GROK_OUTPUT_MISSING_A),

@@ -191,14 +191,20 @@ export async function preprocessImageForOCR(
   }
 }
 
-export async function runOCR(imageSource: Blob | File, onProgress?: (p: number) => void): Promise<string> {
+type OcrPageSegMode = '4' | '6' | '11';
+
+export async function runOCR(
+  imageSource: Blob | File,
+  onProgress?: (p: number) => void,
+  pageSegMode: OcrPageSegMode = '6'
+): Promise<string> {
   progressListener = onProgress ?? null;
   const recognize = async () => {
     const worker = await getSharedWorker();
     const {
       data: { text },
     } = await worker.recognize(imageSource as File, {
-      tessedit_pageseg_mode: '6',
+      tessedit_pageseg_mode: pageSegMode,
       tessedit_oem: '3',
       tessedit_char_whitelist:
         'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,:;/-_()[]#%&*+=@\'" \n',
@@ -215,4 +221,39 @@ export async function runOCR(imageSource: Blob | File, onProgress?: (p: number) 
   } finally {
     progressListener = null;
   }
+}
+
+/** Merge multiple OCR passes — keep the longest useful variant of each unique line. */
+export function mergeOcrTextPasses(...passes: string[]): string {
+  const lineMap = new Map<string, string>();
+
+  for (const pass of passes) {
+    if (!pass?.trim()) continue;
+    for (const rawLine of pass.split(/\r?\n/)) {
+      const trimmed = rawLine.trim();
+      if (!trimmed) continue;
+      const key = trimmed.toLowerCase().replace(/\s+/g, ' ');
+      const existing = lineMap.get(key);
+      if (!existing || trimmed.length > existing.length) {
+        lineMap.set(key, trimmed);
+      }
+    }
+  }
+
+  return [...lineMap.values()].join('\n');
+}
+
+/** Accuracy-first OCR: full preprocess + fast pass + sparse-column PSM for # A–F labels. */
+export async function runMultiPassOCR(
+  file: File,
+  onProgress?: (p: number) => void
+): Promise<string> {
+  const full = await preprocessImageForOCR(file, 'full');
+  const fast = await preprocessImageForOCR(file, 'fast');
+
+  const pass1 = await runOCR(full, onProgress ? (p) => onProgress(Math.round(p * 0.4)) : undefined, '6');
+  const pass2 = await runOCR(fast, onProgress ? (p) => onProgress(40 + Math.round(p * 0.35)) : undefined, '6');
+  const pass3 = await runOCR(full, onProgress ? (p) => onProgress(75 + Math.round(p * 0.25)) : undefined, '4');
+
+  return mergeOcrTextPasses(pass1, pass2, pass3);
 }
