@@ -40,6 +40,8 @@ export function StableTextarea({
         ref={textareaRef}
         {...props}
         value={draft}
+        autoComplete="off"
+        spellCheck
         onFocus={(e) => {
           isFocusedRef.current = true;
           props.onFocus?.(e);
@@ -50,7 +52,7 @@ export function StableTextarea({
           props.onBlur?.(e);
         }}
         onChange={(e) => commit(e.target.value)}
-        className={`flex-1 ${className}`}
+        className={`flex-1 touch-manipulation ${className}`}
       />
       {showVoice && <VoiceInputButton targetRef={textareaRef} onTranscript={commit} className="mt-2 shrink-0" />}
     </div>

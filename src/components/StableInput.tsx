@@ -40,6 +40,7 @@ export function StableInput({
         ref={inputRef}
         {...props}
         value={draft}
+        autoComplete="off"
         onFocus={(e) => {
           isFocusedRef.current = true;
           props.onFocus?.(e);
@@ -50,7 +51,7 @@ export function StableInput({
           props.onBlur?.(e);
         }}
         onChange={(e) => commit(e.target.value)}
-        className={showVoice ? `flex-1 ${className}` : className}
+        className={`${showVoice ? 'flex-1 ' : ''}touch-manipulation ${className}`}
       />
       {showVoice && <VoiceInputButton targetRef={inputRef} onTranscript={commit} />}
     </div>

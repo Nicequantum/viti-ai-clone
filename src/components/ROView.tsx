@@ -116,6 +116,16 @@ export function ROView({
               className="w-full bg-[#2c2c2e] border border-[#38383a] rounded-xl px-3 py-2 text-sm"
             />
           </div>
+          <div>
+            <label className="text-[10px] text-[#8e8e93] block mb-0.5">MILEAGE OUT</label>
+            <StableInput
+              fieldKey={`${ro.id}-mileageOut`}
+              value={ro.vehicle.mileageOut}
+              onChange={(v) => onUpdateVehicle('mileageOut', v)}
+              placeholder="48280"
+              className="w-full bg-[#2c2c2e] border border-[#38383a] rounded-xl px-3 py-2 text-sm"
+            />
+          </div>
         </div>
 
         <div className="mb-3">

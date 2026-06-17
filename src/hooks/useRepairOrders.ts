@@ -55,10 +55,12 @@ export function useRepairOrders({
   const [pendingROImages, setPendingROImages] = useState<PendingImage[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [openingROId, setOpeningROId] = useState<string | null>(null);
   const scanCancelledRef = useRef(false);
   const scanInFlightRef = useRef(false);
   const scanSessionRef = useRef(0);
   const roRef = useRef<RepairOrder | null>(null);
+  const openingROInFlightRef = useRef<string | null>(null);
 
   useEffect(() => {
     roRef.current = currentRO;
@@ -191,15 +193,46 @@ export function useRepairOrders({
     [currentRO]
   );
 
-  const openRO = useCallback(
-    (ro: RepairOrder) => {
-      const normalized = ensureComplaintIds(ro);
-      roRef.current = normalized;
-      setCurrentRO(normalized);
-      setCurrentLineId(null);
-      navigateView('ro');
+  const openROById = useCallback(
+    async (id: string) => {
+      if (openingROInFlightRef.current === id) return;
+      openingROInFlightRef.current = id;
+      setOpeningROId(id);
+      flushPendingSave();
+      try {
+        const { repairOrder } = await api.getRepairOrder(id);
+        const normalized = ensureComplaintIds(repairOrder);
+        roRef.current = normalized;
+        setCurrentRO(normalized);
+        setCurrentLineId(null);
+        setAllROs((prev) => {
+          const idx = prev.findIndex((r) => r.id === normalized.id);
+          if (idx >= 0) {
+            const copy = [...prev];
+            copy[idx] = normalized;
+            return copy;
+          }
+          return [normalized, ...prev];
+        });
+        navigateView('ro');
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Failed to load repair order');
+      } finally {
+        if (openingROInFlightRef.current === id) {
+          openingROInFlightRef.current = null;
+        }
+        setOpeningROId((current) => (current === id ? null : current));
+      }
     },
-    [navigateView]
+    [flushPendingSave, navigateView]
+  );
+
+  const openRO = useCallback(
+    (target: RepairOrder | string) => {
+      const id = typeof target === 'string' ? target : target.id;
+      void openROById(id);
+    },
+    [openROById]
   );
 
   const createROFromText = useCallback(async (text: string) => {
@@ -849,11 +882,13 @@ export function useRepairOrders({
     pendingROImages,
     setPendingROImages,
     isGenerating,
+    openingROId,
     filteredROs,
     flushPendingSave,
     navigateToLine,
     deleteRO,
     openRO,
+    openROById,
     scanRO,
     addScanPagesFromGallery,
     processPendingScan,

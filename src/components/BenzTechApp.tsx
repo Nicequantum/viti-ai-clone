@@ -5,8 +5,10 @@ import { ConsentModal } from '@/components/ConsentModal';
 import { HomeView } from '@/components/HomeView';
 import { LineView } from '@/components/LineView';
 import { LoginView } from '@/components/LoginView';
+import { LoadingOverlay } from '@/components/LoadingOverlay';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { ManagerDashboard } from '@/components/ManagerDashboard';
+import { RepairOrderList } from '@/components/RepairOrderList';
 import { ROView } from '@/components/ROView';
 import { AuditLogView } from '@/components/AuditLogView';
 import { ServiceAdvisorsView } from '@/components/ServiceAdvisorsView';
@@ -58,52 +60,33 @@ export function BenzTechApp() {
   const goToSettings = () => ro.setView('settings');
   const isManager = session.role === 'manager';
 
-  const roListSection =
-    ro.filteredROs.length === 0 ? (
-      <div className="text-center py-8 text-[#8e8e93]">
-        <p className="text-sm">No repair orders match your search.</p>
-        <p className="text-xs mt-1">Scan a repair order to get started.</p>
-      </div>
-    ) : (
-      <div className="space-y-2">
-        {ro.filteredROs.map((item) => (
-          <div
-            key={item.id}
-            onClick={() => ro.openRO(item)}
-            className="ios-card p-3 active:bg-[#252528] cursor-pointer flex justify-between items-center"
-          >
-            <div>
-              <div className="font-semibold text-sm">{item.roNumber}</div>
-              <div className="text-xs text-[#8e8e93]">
-                {[item.vehicle.year, item.vehicle.make, item.vehicle.model].filter(Boolean).join(' ')} •{' '}
-                {item.repairLines.length} lines
-                {item.technicianName ? ` • ${item.technicianName}` : ''}
-              </div>
-              {item.complaints[0] && (
-                <div className="text-[10px] text-[#8e8e93] mt-0.5">{item.complaints[0].slice(0, 72)}...</div>
-              )}
-            </div>
-            <div className="text-right">
-              {item.repairLines.some((l) => l.warrantyStory) && (
-                <div className="text-[10px] text-[#30d158]">✓ stories</div>
-              )}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  ro.deleteRO(item.id);
-                }}
-                className="text-[10px] text-[#ff9f0a] mt-1"
-              >
-                DEL
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
+  const roListSection = (
+    <>
+      {ro.filteredROs.length > 0 && (
+        <div className="text-xs uppercase tracking-widest text-[#8e8e93] mb-2 px-1">Previous Repair Orders</div>
+      )}
+      <RepairOrderList
+        repairOrders={ro.filteredROs}
+        openingROId={ro.openingROId}
+        onOpenRO={ro.openRO}
+        onDeleteRO={ro.deleteRO}
+        emptyMessage="No repair orders match your search."
+        emptyHint="Scan a repair order to get started."
+      />
+    </>
+  );
+
+  const openingRoNumber =
+    ro.openingROId &&
+    (ro.allROs.find((item) => item.id === ro.openingROId)?.roNumber || 'repair order');
 
   return (
     <div className="app-container">
+      <LoadingOverlay
+        visible={!!ro.openingROId}
+        message={openingRoNumber ? `Loading ${openingRoNumber}…` : 'Loading repair order…'}
+      />
+
       {ro.view !== 'home' && ro.view !== 'settings' && ro.view !== 'audit' && ro.view !== 'advisors' && (
         <AppHeader technicianName={session.name} onOpenSettings={goToSettings} />
       )}
@@ -111,10 +94,9 @@ export function BenzTechApp() {
       {ro.view === 'home' && isManager && (
         <ManagerDashboard
           session={session}
-          allROs={ro.allROs}
-          filteredROs={ro.filteredROs}
           searchTerm={ro.searchTerm}
           onSearchChange={ro.setSearchTerm}
+          openingROId={ro.openingROId}
           onOpenRO={ro.openRO}
           onOpenSettings={goToSettings}
           onOpenAuditLogs={() => ro.setView('audit')}
@@ -150,6 +132,7 @@ export function BenzTechApp() {
           onClearPendingScan={ro.clearPendingScan}
           onCancelScan={ro.cancelScan}
           onCreateManualRO={ro.createManualRO}
+          openingROId={ro.openingROId}
           onOpenRO={ro.openRO}
           onDeleteRO={ro.deleteRO}
           onOpenSettings={goToSettings}

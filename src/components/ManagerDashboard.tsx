@@ -20,11 +20,10 @@ import type { DashboardSummary, RepairOrder, TechnicianSession } from '@/types';
 
 interface ManagerDashboardProps {
   session: TechnicianSession;
-  allROs: RepairOrder[];
-  filteredROs: RepairOrder[];
   searchTerm: string;
   onSearchChange: (value: string) => void;
-  onOpenRO: (ro: RepairOrder) => void;
+  openingROId: string | null;
+  onOpenRO: (target: RepairOrder | string) => void;
   onOpenSettings: () => void;
   onOpenAuditLogs: () => void;
   onOpenServiceAdvisors: () => void;
@@ -65,10 +64,9 @@ function StatCard({
 
 export function ManagerDashboard({
   session,
-  allROs,
-  filteredROs,
   searchTerm,
   onSearchChange,
+  openingROId,
   onOpenRO,
   onOpenSettings,
   onOpenAuditLogs,
@@ -183,24 +181,37 @@ export function ManagerDashboard({
             <div className="ios-card p-4 mb-4">
               <div className="text-xs uppercase tracking-widest text-[#8e8e93] mb-3">Recent Shop Activity</div>
               <div className="space-y-2">
-                {summary.recentRepairOrders.map((ro) => (
-                  <button
-                    key={ro.id}
-                    onClick={() => {
-                      const full = allROs.find((r) => r.id === ro.id);
-                      if (full) onOpenRO(full);
-                    }}
-                    className="w-full text-left bg-[#1c1c1e] rounded-lg px-3 py-2"
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">{ro.roNumber}</span>
-                      {ro.hasStories && <span className="text-[10px] text-[#30d158]">✓ story</span>}
-                    </div>
-                    <div className="text-[10px] text-[#8e8e93]">
-                      {[ro.year, ro.make, ro.model].filter(Boolean).join(' ')} · {ro.technicianName}
-                    </div>
-                  </button>
-                ))}
+                {summary.recentRepairOrders.map((ro) => {
+                  const isOpening = openingROId === ro.id;
+                  const isBusy = openingROId !== null;
+                  return (
+                    <button
+                      key={ro.id}
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => onOpenRO(ro.id)}
+                      className={`w-full text-left bg-[#1c1c1e] rounded-lg px-3 py-2 transition-colors touch-manipulation ${
+                        isOpening
+                          ? 'ring-2 ring-[#0a84ff]/60 cursor-wait'
+                          : isBusy
+                            ? 'opacity-60 cursor-not-allowed'
+                            : 'active:bg-[#2c2c2e] hover:bg-[#252528] cursor-pointer'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">{ro.roNumber}</span>
+                        {isOpening ? (
+                          <span className="text-[10px] text-[#0a84ff]">Loading…</span>
+                        ) : (
+                          ro.hasStories && <span className="text-[10px] text-[#30d158]">✓ story</span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-[#8e8e93]">
+                        {[ro.year, ro.make, ro.model].filter(Boolean).join(' ')} · {ro.technicianName}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

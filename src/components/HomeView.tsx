@@ -1,5 +1,6 @@
 import { Settings } from 'lucide-react';
 import { DealershipBranding } from '@/components/DealershipBranding';
+import { RepairOrderList } from '@/components/RepairOrderList';
 import { ScanROSection } from '@/components/ScanROSection';
 import type { PendingImage, RepairOrder } from '../types';
 
@@ -18,6 +19,7 @@ interface HomeViewProps {
   onClearPendingScan: () => void;
   onCancelScan: () => void;
   onCreateManualRO: () => void;
+  openingROId: string | null;
   onOpenRO: (ro: RepairOrder) => void;
   onDeleteRO: (id: string) => void;
   onOpenSettings: () => void;
@@ -38,6 +40,7 @@ export function HomeView({
   onClearPendingScan,
   onCancelScan,
   onCreateManualRO,
+  openingROId,
   onOpenRO,
   onDeleteRO,
   onOpenSettings,
@@ -85,44 +88,18 @@ export function HomeView({
           />
         </div>
 
-        {filteredROs.length === 0 ? (
-          <div className="text-center py-10 text-[#8e8e93]">
-            <p>No repair orders yet.</p>
-            <p className="text-xs mt-1">Tap Scan RO to capture or upload repair order pages.</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {filteredROs.map((ro) => (
-              <div
-                key={ro.id}
-                onClick={() => onOpenRO(ro)}
-                className="ios-card p-3 active:bg-[#252528] cursor-pointer flex justify-between items-center"
-              >
-                <div>
-                  <div className="font-semibold text-sm">{ro.roNumber}</div>
-                  <div className="text-xs text-[#8e8e93]">
-                    {[ro.vehicle.year, ro.vehicle.make, ro.vehicle.model].filter(Boolean).join(' ')} • {ro.repairLines.length} lines
-                    {ro.technicianName ? ` • ${ro.technicianName}` : ''}
-                  </div>
-                  <div className="text-[10px] text-[#8e8e93] mt-0.5">{ro.complaints[0]?.slice(0, 60)}...</div>
-                  <div className="text-[9px] text-[#666]">{ro.createdAt ? new Date(ro.createdAt).toLocaleDateString() : ''}</div>
-                </div>
-                <div className="text-right">
-                  {ro.repairLines.some((l) => l.warrantyStory) && <div className="text-[10px] text-[#30d158]">✓ stories</div>}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteRO(ro.id);
-                    }}
-                    className="text-[10px] text-[#ff9f0a] mt-1"
-                  >
-                    DEL
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+        {filteredROs.length > 0 && (
+          <div className="text-xs uppercase tracking-widest text-[#8e8e93] mb-2 px-1">Previous Repair Orders</div>
         )}
+
+        <RepairOrderList
+          repairOrders={filteredROs}
+          openingROId={openingROId}
+          onOpenRO={onOpenRO}
+          onDeleteRO={onDeleteRO}
+          emptyMessage="No repair orders yet."
+          emptyHint="Tap Scan RO to capture or upload repair order pages."
+        />
       </div>
     </div>
   );
