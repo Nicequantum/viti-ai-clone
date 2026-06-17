@@ -172,7 +172,7 @@ function scoreKnowledgeEntry(
 
   if (entry.source === 'user') score += 8;
   if (entry.tags.includes('user-saved')) score += 4;
-  if (entry.generatedText && entry.fullOriginalText) score += 2;
+  if (entry.generatedText?.trim() && (entry.fullOriginalText.trim() || entry.cleanTemplate.trim())) score += 2;
 
   if (descLower.includes(titleLower) || titleLower.includes(descLower)) {
     score += 12;
@@ -212,8 +212,11 @@ export function selectRelevantKnowledgeEntries(
     .join(' ')
     .toLowerCase();
 
+  const hasUsableContent = (entry: KnowledgeBaseRecord) =>
+    entry.fullOriginalText.trim().length > 0 || entry.cleanTemplate.trim().length > 0;
+
   const scored = [...entries]
-    .filter((entry) => entry.fullOriginalText.trim().length > 0)
+    .filter(hasUsableContent)
     .map((entry) => ({ entry, score: scoreKnowledgeEntry(entry, haystack, line.description) }))
     .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score);
@@ -229,12 +232,13 @@ export function formatKnowledgeBaseForPrompt(entries: KnowledgeBaseRecord[]): st
   if (entries.length === 0) return '';
 
   const blocks = entries.map((entry, index) => {
+    const approvedStory = entry.fullOriginalText.trim() || entry.cleanTemplate.trim();
     const lines = [
       `### Reference ${index + 1}: ${entry.title} (${entry.category}, ${entry.source})`,
       `Tags: ${entry.tags.join(', ')}`,
       '',
       'APPROVED FINAL STORY (primary style reference — mirror tone, sequencing, and technician voice):',
-      entry.fullOriginalText,
+      approvedStory,
     ];
 
     if (entry.generatedText?.trim()) {

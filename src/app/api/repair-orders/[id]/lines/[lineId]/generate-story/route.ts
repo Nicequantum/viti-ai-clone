@@ -8,6 +8,7 @@ import { prisma } from '@/lib/db';
 import { generateWarrantyStory } from '@/lib/grok';
 import {
   formatKnowledgeBaseForPrompt,
+  GLOBAL_DEALERSHIP_ID,
   mapKnowledgeBase,
   seedTemplateLibraryIfEmpty,
   selectRelevantKnowledgeEntries,
@@ -72,7 +73,7 @@ export async function POST(
       await seedTemplateLibraryIfEmpty();
       const kbRows = await prisma.knowledgeBase.findMany({
         where: {
-          OR: [{ dealershipId: '__global__' }, { dealershipId: session.dealershipId, source: 'user' }],
+          OR: [{ dealershipId: GLOBAL_DEALERSHIP_ID }, { dealershipId: session.dealershipId, source: 'user' }],
         },
         orderBy: [{ source: 'desc' }, { updatedAt: 'desc' }],
       });

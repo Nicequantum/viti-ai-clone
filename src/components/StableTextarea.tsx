@@ -21,14 +21,23 @@ export function StableTextarea({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState(value);
   const isFocusedRef = useRef(false);
+  const lastEmittedRef = useRef(value);
 
   useEffect(() => {
-    if (!isFocusedRef.current) setDraft(value);
-  }, [value, fieldKey]);
+    lastEmittedRef.current = value;
+    setDraft(value);
+  }, [fieldKey]);
+
+  useEffect(() => {
+    if (value === lastEmittedRef.current) return;
+    lastEmittedRef.current = value;
+    setDraft(value);
+  }, [value]);
 
   const commit = useCallback(
     (next: string) => {
       setDraft(next);
+      lastEmittedRef.current = next;
       onChange(next);
     },
     [onChange]

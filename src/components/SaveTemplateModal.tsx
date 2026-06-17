@@ -9,7 +9,7 @@ import type { TemplateCategory } from '@/types';
 interface SaveTemplateModalProps {
   open: boolean;
   onClose: () => void;
-  onSaved: (title: string) => void;
+  onSaved: (title: string, savedText: string) => void;
   defaultTitle: string;
   defaultCategory: TemplateCategory;
   storyText: string;
@@ -85,7 +85,7 @@ export function SaveTemplateModal({
         lineId,
       });
       toast.success(`Template "${trimmedTitle}" saved — Grok will learn from this story`);
-      onSaved(trimmedTitle);
+      onSaved(trimmedTitle, trimmedPreview);
       onClose();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to save template');

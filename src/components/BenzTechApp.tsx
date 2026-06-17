@@ -172,6 +172,7 @@ export function BenzTechApp() {
           onAddXentryPhotos={() => ro.addXentryPhotos(ro.currentLine!.id)}
           onApplySmartDefaults={() => ro.applySmartDefaultsToLine(ro.currentLine!.id)}
           onGenerateStory={() => ro.generateStory(ro.currentLine!.id)}
+          onAcknowledgeStoryBaseline={(text) => ro.acknowledgeStoryBaseline(ro.currentLine!.id, text)}
         />
       )}
 

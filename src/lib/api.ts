@@ -168,6 +168,7 @@ export const api = {
   generateStory: (roId: string, lineId: string) =>
     apiFetch<{ warrantyStory: string }>(`/api/repair-orders/${roId}/lines/${lineId}/generate-story`, {
       method: 'POST',
+      timeoutMs: 120_000,
     }),
 
   listTemplates: (category?: TemplateCategory) => {
@@ -183,7 +184,7 @@ export const api = {
   saveTemplateFromStory: (payload: SaveTemplateFromStoryPayload) =>
     apiFetch<{ template: StoryTemplate; knowledgeBase: KnowledgeBaseEntry; tags: string[] }>(
       '/api/templates/save-from-story',
-      { method: 'POST', body: JSON.stringify(payload) }
+      { method: 'POST', body: JSON.stringify(payload), timeoutMs: 30_000 }
     ),
 
   recordTemplateUse: (templateId: string) =>

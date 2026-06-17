@@ -24,6 +24,7 @@ interface LineViewProps {
   onAddXentryPhotos: () => void;
   onApplySmartDefaults: () => void;
   onGenerateStory: () => void;
+  onAcknowledgeStoryBaseline: (text: string) => void;
 }
 
 function complaintLabel(labels: string[] | undefined, index: number): string {
@@ -48,6 +49,7 @@ export function LineView({
   onAddXentryPhotos,
   onApplySmartDefaults,
   onGenerateStory,
+  onAcknowledgeStoryBaseline,
 }: LineViewProps) {
   const vehicleSummary = [ro.vehicle.year, ro.vehicle.make, ro.vehicle.model].filter(Boolean).join(' ') || 'Vehicle';
   const mileageStr = ro.vehicle.mileageIn ? `${ro.vehicle.mileageIn} mi` : '';
@@ -331,7 +333,10 @@ export function LineView({
         <SaveTemplateModal
           open={showSaveTemplate}
           onClose={() => setShowSaveTemplate(false)}
-          onSaved={() => setLibraryRefreshKey((k) => k + 1)}
+          onSaved={(_title, savedText) => {
+            onAcknowledgeStoryBaseline(savedText);
+            setLibraryRefreshKey((k) => k + 1);
+          }}
           defaultTitle={defaultTemplateTitle}
           defaultCategory="warranty"
           storyText={line.warrantyStory || ''}

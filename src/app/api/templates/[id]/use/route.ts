@@ -1,6 +1,6 @@
 import { withAuth } from '@/lib/apiRoute';
 import { apiError, NOT_FOUND_ERROR } from '@/lib/errors';
-import { recordTemplateUsage } from '@/lib/templateLibrary';
+import { GLOBAL_DEALERSHIP_ID, recordTemplateUsage } from '@/lib/templateLibrary';
 import { prisma } from '@/lib/db';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -12,7 +12,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const template = await prisma.template.findFirst({
         where: {
           id,
-          OR: [{ dealershipId: session.dealershipId }, { dealershipId: '__global__' }],
+          OR: [{ dealershipId: session.dealershipId }, { dealershipId: GLOBAL_DEALERSHIP_ID }],
         },
       });
 

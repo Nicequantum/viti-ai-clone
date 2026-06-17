@@ -62,6 +62,8 @@ export function useRepairOrders({
   const scanSessionRef = useRef(0);
   const roRef = useRef<RepairOrder | null>(null);
   const openingROInFlightRef = useRef<string | null>(null);
+  const generateStorySeqRef = useRef(0);
+  const storyGenerationInFlightRef = useRef(false);
 
   useEffect(() => {
     roRef.current = currentRO;
@@ -184,6 +186,9 @@ export function useRepairOrders({
         if (currentRO?.id === id) {
           setCurrentRO(null);
           setCurrentLineId(null);
+          setLastGeneratedStoryByLine({});
+          generateStorySeqRef.current += 1;
+          storyGenerationInFlightRef.current = false;
           setView('home');
         }
         toast.success('Repair order deleted');
@@ -206,6 +211,9 @@ export function useRepairOrders({
         roRef.current = normalized;
         setCurrentRO(normalized);
         setCurrentLineId(null);
+        setLastGeneratedStoryByLine({});
+        generateStorySeqRef.current += 1;
+        storyGenerationInFlightRef.current = false;
         setAllROs((prev) => {
           const idx = prev.findIndex((r) => r.id === normalized.id);
           if (idx >= 0) {
@@ -822,29 +830,59 @@ export function useRepairOrders({
 
   const generateStory = useCallback(
     async (lineId: string) => {
+      if (storyGenerationInFlightRef.current) return;
       flushPendingSave();
       const latestRO = roRef.current;
       if (!latestRO) return;
+      const roId = latestRO.id;
+      const lineExists = latestRO.repairLines.some((line) => line.id === lineId);
+      if (!lineExists) {
+        toast.error('Repair line not found — refresh the RO and try again');
+        return;
+      }
+
+      const seq = ++generateStorySeqRef.current;
+      storyGenerationInFlightRef.current = true;
       setIsGenerating(true);
       try {
-        const { warrantyStory } = await api.generateStory(latestRO.id, lineId);
+        const { warrantyStory } = await api.generateStory(roId, lineId);
+        if (seq !== generateStorySeqRef.current) return;
+
+        const activeRO = roRef.current;
+        if (!activeRO || activeRO.id !== roId) {
+          toast.success('Story generated — reopen the repair order to view it');
+          return;
+        }
+
         setLastGeneratedStoryByLine((prev) => ({ ...prev, [lineId]: warrantyStory }));
         applyROUpdate(
-          (ro) => ({
-            ...ro,
-            repairLines: ro.repairLines.map((l) => (l.id === lineId ? { ...l, warrantyStory } : l)),
-          }),
+          (ro) => {
+            if (ro.id !== roId) return ro;
+            return {
+              ...ro,
+              repairLines: ro.repairLines.map((l) => (l.id === lineId ? { ...l, warrantyStory } : l)),
+            };
+          },
           { immediate: true }
         );
         toast.success('Warranty story generated — edit as needed, then save as a template');
       } catch (error: unknown) {
-        toast.error(error instanceof Error ? error.message : 'Story generation failed');
+        if (seq === generateStorySeqRef.current) {
+          toast.error(error instanceof Error ? error.message : 'Story generation failed');
+        }
       } finally {
-        setIsGenerating(false);
+        if (seq === generateStorySeqRef.current) {
+          storyGenerationInFlightRef.current = false;
+          setIsGenerating(false);
+        }
       }
     },
     [applyROUpdate, flushPendingSave]
   );
+
+  const acknowledgeStoryBaseline = useCallback((lineId: string, text: string) => {
+    setLastGeneratedStoryByLine((prev) => ({ ...prev, [lineId]: text }));
+  }, []);
 
   const currentLine = currentRO?.repairLines.find((l) => l.id === currentLineId);
   const lastGeneratedStoryForLine =
@@ -915,5 +953,6 @@ export function useRepairOrders({
     addXentryPhotos,
     addROXentryPhotos,
     generateStory,
+    acknowledgeStoryBaseline,
   };
 }

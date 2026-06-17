@@ -92,6 +92,27 @@ describe('knowledge base selection', () => {
     assert.match(prompt, /Blind Spot Assist Warning/);
     assert.match(prompt, /GROWING DEALERSHIP/i);
   });
+
+  it('selects seed templates via cleanTemplate when fullOriginalText is empty', () => {
+    const entries = [
+      kbFromSeed('Blind Spot Assist Warning', ''),
+      kbFromSeed('B Service', ''),
+    ];
+    const selected = selectRelevantKnowledgeEntries(baseRo, baseLine, entries, 'dealer-1', 3);
+    assert.equal(selected[0]?.title, 'Blind Spot Assist Warning');
+  });
+
+  it('falls back to cleanTemplate in prompt when fullOriginalText is empty', () => {
+    const seed = STORY_TEMPLATE_SEEDS.find((s) => s.title === 'B Service')!;
+    const prompt = formatKnowledgeBaseForPrompt([
+      {
+        ...kbFromSeed('B Service', ''),
+        cleanTemplate: seed.complaint,
+      },
+    ]);
+    assert.match(prompt, /B Service/);
+    assert.ok(prompt.includes(seed.complaint));
+  });
 });
 
 describe('template tags', () => {

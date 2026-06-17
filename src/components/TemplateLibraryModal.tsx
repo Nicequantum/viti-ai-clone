@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, Clock3, FileText, Loader2, Search, ShieldCheck, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/lib/api';
@@ -34,14 +34,19 @@ export function TemplateLibraryModal({ open, onClose, onInsert }: TemplateLibrar
   const [activeTab, setActiveTab] = useState<TabId>('warranty');
   const [templates, setTemplates] = useState<StoryTemplate[]>([]);
   const [loading, setLoading] = useState(false);
+  const [insertingId, setInsertingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [recentRefs, setRecentRefs] = useState<RecentTemplateRef[]>([]);
+  const loadSeqRef = useRef(0);
 
   const loadTemplates = useCallback(async () => {
+    const seq = ++loadSeqRef.current;
     setLoading(true);
     try {
       const { templates: rows } = await api.listTemplates();
+      if (seq !== loadSeqRef.current) return;
+
       setTemplates(rows);
       setRecentRefs(getRecentTemplateRefs());
       setSelectedId((current) => {
@@ -50,26 +55,34 @@ export function TemplateLibraryModal({ open, onClose, onInsert }: TemplateLibrar
         return firstWarranty?.id ?? null;
       });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to load templates');
+      if (seq === loadSeqRef.current) {
+        toast.error(e instanceof Error ? e.message : 'Failed to load templates');
+      }
     } finally {
-      setLoading(false);
+      if (seq === loadSeqRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    if (open) {
-      void loadTemplates();
+    if (!open) {
+      loadSeqRef.current += 1;
+      setSearch('');
+      setInsertingId(null);
+      return;
     }
+    void loadTemplates();
   }, [open, loadTemplates]);
 
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !insertingId) onClose();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
+  }, [open, onClose, insertingId]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -87,12 +100,16 @@ export function TemplateLibraryModal({ open, onClose, onInsert }: TemplateLibrar
   }, [recentRefs, templates, activeTab]);
 
   useEffect(() => {
-    if (filtered.length > 0 && !filtered.some((t) => t.id === selectedId)) {
+    if (filtered.length === 0) {
+      setSelectedId(null);
+      return;
+    }
+    if (!selectedId || !filtered.some((t) => t.id === selectedId)) {
       setSelectedId(filtered[0].id);
     }
   }, [filtered, selectedId]);
 
-  const selected = filtered.find((t) => t.id === selectedId) || filtered[0];
+  const selected = filtered.find((t) => t.id === selectedId) ?? null;
 
   const tabCounts = useMemo(
     () => ({
@@ -103,19 +120,27 @@ export function TemplateLibraryModal({ open, onClose, onInsert }: TemplateLibrar
   );
 
   const handleInsert = async (template: StoryTemplate) => {
+    if (insertingId) return;
+    setInsertingId(template.id);
     try {
-      await api.recordTemplateUse(template.id);
-    } catch {
-      // Non-blocking — local recent list still works
+      try {
+        await api.recordTemplateUse(template.id);
+      } catch {
+        // Non-blocking — local recent list still works
+      }
+      recordRecentTemplate({
+        id: template.id,
+        title: template.title,
+        category: template.category,
+      });
+      setRecentRefs(getRecentTemplateRefs());
+      onInsert(template.content, template.title);
+      onClose();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to insert template');
+    } finally {
+      setInsertingId(null);
     }
-    recordRecentTemplate({
-      id: template.id,
-      title: template.title,
-      category: template.category,
-    });
-    setRecentRefs(getRecentTemplateRefs());
-    onInsert(template.content, template.title);
-    onClose();
   };
 
   if (!open) return null;
@@ -135,7 +160,8 @@ export function TemplateLibraryModal({ open, onClose, onInsert }: TemplateLibrar
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl border border-[#38383a] text-[#8e8e93] hover:text-white"
+            disabled={!!insertingId}
+            className="p-2 rounded-xl border border-[#38383a] text-[#8e8e93] hover:text-white disabled:opacity-50"
             aria-label="Close template library"
           >
             <X size={18} />
@@ -252,17 +278,32 @@ export function TemplateLibraryModal({ open, onClose, onInsert }: TemplateLibrar
                   <button
                     type="button"
                     onClick={() => void handleInsert(selected)}
-                    className="primary-btn flex-1 h-11 text-sm"
+                    disabled={!!insertingId}
+                    className="primary-btn flex-1 h-11 text-sm flex items-center justify-center gap-2 disabled:opacity-60"
                   >
-                    INSERT INTO STORY
+                    {insertingId === selected.id ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        INSERTING…
+                      </>
+                    ) : (
+                      'INSERT INTO STORY'
+                    )}
                   </button>
-                  <button type="button" onClick={onClose} className="secondary-btn h-11 px-4 text-sm">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    disabled={!!insertingId}
+                    className="secondary-btn h-11 px-4 text-sm disabled:opacity-60"
+                  >
                     Cancel
                   </button>
                 </div>
               </>
             ) : (
-              <div className="p-6 text-sm text-[#8e8e93]">Select a template to preview.</div>
+              <div className="p-6 text-sm text-[#8e8e93]">
+                {loading ? 'Loading templates…' : 'Select a template to preview.'}
+              </div>
             )}
           </div>
         </div>
