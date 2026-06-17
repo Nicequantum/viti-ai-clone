@@ -10,6 +10,19 @@ Benz Tech helps authorized Mercedes-Benz dealership service teams create audit-s
 | **Service Manager** | Dealership-wide RO visibility, user administration, audit log with hash-chain integrity, CSV export |
 | **Fixed Ops Director** | Pilot-ready platform with encrypted PII, session controls, structured logging, and health monitoring |
 
+## UI Stability (v2.3+)
+
+The dealership UI uses several patterns to keep text editing reliable during voice input and rapid typing:
+
+| Feature | Purpose |
+|---------|---------|
+| **StableTextarea / StableInput** | Local draft state while a field is focused — prevents parent re-renders from resetting deleted or in-progress text |
+| **VoiceInputButton** | Web SpeechRecognition with interim results and cursor preservation on complaints, notes, and warranty story fields |
+| **Debounced RO saves** | Editable fields update optimistically in memory; PostgreSQL writes are debounced (~450ms) to reduce lag and race conditions |
+| **Sonner toasts** | User-friendly notifications instead of blocking browser dialogs |
+| **ErrorBoundary** | Graceful retry UI if a view throws an unexpected error |
+| **Image compression** | Photos are resized/compressed client-side before Vercel Blob upload |
+
 ## Architecture Overview
 
 ```
@@ -168,7 +181,7 @@ Complete this list before going live with real customer data:
 ```
 prisma/migrations/     # Versioned schema migrations (use migrate deploy)
 src/app/api/           # REST API routes
-src/components/        # UI views (ManagerDashboard, AuditLogView, etc.)
+src/components/        # UI views + StableTextarea, VoiceInputButton, ErrorBoundary
 src/lib/               # Auth, encryption, audit chain, logging
 src/prompts/           # Audit-safe AI prompt templates
 src/services/          # Client-side OCR (Tesseract.js)

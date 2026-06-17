@@ -1,4 +1,6 @@
 import { Camera, Plus, Trash2 } from 'lucide-react';
+import { StableInput } from '@/components/StableInput';
+import { StableTextarea } from '@/components/StableTextarea';
 import type { RepairOrder } from '../types';
 
 interface ROViewProps {
@@ -64,9 +66,10 @@ export function ROView({
 
         <div className="mb-3">
           <label className="text-[10px] text-[#8e8e93] block mb-0.5">RO NUMBER</label>
-          <input
+          <StableInput
+            fieldKey={`${ro.id}-roNumber`}
             value={ro.roNumber}
-            onChange={(e) => onUpdateRONumber(e.target.value)}
+            onChange={onUpdateRONumber}
             placeholder="RO-123456"
             className="w-full bg-[#2c2c2e] border border-[#38383a] rounded-xl px-3 py-2 text-sm font-mono tracking-[1px]"
           />
@@ -75,78 +78,85 @@ export function ROView({
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
             <label className="text-[10px] text-[#8e8e93] block mb-0.5">YEAR</label>
-            <input
+            <StableInput
+              fieldKey={`${ro.id}-year`}
               value={ro.vehicle.year}
-              onChange={(e) => onUpdateVehicle('year', e.target.value)}
+              onChange={(v) => onUpdateVehicle('year', v)}
               placeholder="2023"
               className="w-full bg-[#2c2c2e] border border-[#38383a] rounded-xl px-3 py-2 text-sm"
             />
           </div>
           <div>
             <label className="text-[10px] text-[#8e8e93] block mb-0.5">MAKE</label>
-            <input
+            <StableInput
+              fieldKey={`${ro.id}-make`}
               value={ro.vehicle.make}
-              onChange={(e) => onUpdateVehicle('make', e.target.value)}
+              onChange={(v) => onUpdateVehicle('make', v)}
               placeholder="Mercedes-Benz"
               className="w-full bg-[#2c2c2e] border border-[#38383a] rounded-xl px-3 py-2 text-sm"
             />
           </div>
           <div>
             <label className="text-[10px] text-[#8e8e93] block mb-0.5">MODEL</label>
-            <input
+            <StableInput
+              fieldKey={`${ro.id}-model`}
               value={ro.vehicle.model}
-              onChange={(e) => onUpdateVehicle('model', e.target.value)}
+              onChange={(v) => onUpdateVehicle('model', v)}
               placeholder="GLE 450 4MATIC"
               className="w-full bg-[#2c2c2e] border border-[#38383a] rounded-xl px-3 py-2 text-sm"
             />
           </div>
           <div>
             <label className="text-[10px] text-[#8e8e93] block mb-0.5">MILEAGE IN</label>
-            <input
+            <StableInput
+              fieldKey={`${ro.id}-mileageIn`}
               value={ro.vehicle.mileageIn}
-              onChange={(e) => onUpdateVehicle('mileageIn', e.target.value)}
+              onChange={(v) => onUpdateVehicle('mileageIn', v)}
               placeholder="48250"
               className="w-full bg-[#2c2c2e] border border-[#38383a] rounded-xl px-3 py-2 text-sm"
             />
           </div>
         </div>
 
-          <div className="mb-3">
-            <label className="text-[10px] text-[#8e8e93] block mb-0.5">VIN</label>
-            <div className="flex gap-2">
-              <input
-                value={ro.vehicle.vin}
-                onChange={(e) => onUpdateVehicle('vin', e.target.value.toUpperCase())}
-                placeholder="W1Nxxxx..."
-                maxLength={17}
-                className="flex-1 bg-[#2c2c2e] border border-[#38383a] rounded-xl px-3 py-2 text-sm font-mono tracking-[1px]"
-              />
-              <button
-                onClick={onDecodeVin}
-                disabled={ro.vehicle.vin.length < 17}
-                className="secondary-btn px-3 text-[10px] font-semibold whitespace-nowrap disabled:opacity-50"
-              >
-                DECODE VIN
-              </button>
-            </div>
-            <p className="text-[9px] text-[#666] mt-1">NHTSA vPIC — auto-fills year, make, model, engine</p>
-          </div>
-
-          <div className="mb-3">
-            <label className="text-[10px] text-[#8e8e93] block mb-0.5">ENGINE</label>
-            <input
-              value={ro.vehicle.engine || ''}
-              onChange={(e) => onUpdateVehicle('engine', e.target.value)}
-              placeholder="3.0L 6-cyl (from VIN decode)"
-              className="w-full bg-[#2c2c2e] border border-[#38383a] rounded-xl px-3 py-2 text-sm"
+        <div className="mb-3">
+          <label className="text-[10px] text-[#8e8e93] block mb-0.5">VIN</label>
+          <div className="flex gap-2">
+            <StableInput
+              fieldKey={`${ro.id}-vin`}
+              value={ro.vehicle.vin}
+              onChange={(v) => onUpdateVehicle('vin', v.toUpperCase())}
+              placeholder="W1Nxxxx..."
+              maxLength={17}
+              className="flex-1 bg-[#2c2c2e] border border-[#38383a] rounded-xl px-3 py-2 text-sm font-mono tracking-[1px]"
             />
+            <button
+              onClick={onDecodeVin}
+              disabled={ro.vehicle.vin.length < 17}
+              className="secondary-btn px-3 text-[10px] font-semibold whitespace-nowrap disabled:opacity-50"
+            >
+              DECODE VIN
+            </button>
           </div>
+          <p className="text-[9px] text-[#666] mt-1">NHTSA vPIC — auto-fills year, make, model, engine</p>
+        </div>
+
+        <div className="mb-3">
+          <label className="text-[10px] text-[#8e8e93] block mb-0.5">ENGINE</label>
+          <StableInput
+            fieldKey={`${ro.id}-engine`}
+            value={ro.vehicle.engine || ''}
+            onChange={(v) => onUpdateVehicle('engine', v)}
+            placeholder="3.0L 6-cyl (from VIN decode)"
+            className="w-full bg-[#2c2c2e] border border-[#38383a] rounded-xl px-3 py-2 text-sm"
+          />
+        </div>
 
         <div className="mb-4">
           <label className="text-[10px] text-[#8e8e93] block mb-0.5">CUSTOMER NAME</label>
-          <input
+          <StableInput
+            fieldKey={`${ro.id}-customer`}
             value={ro.customer?.name || ''}
-            onChange={(e) => onUpdateCustomer(e.target.value)}
+            onChange={onUpdateCustomer}
             placeholder="John Smith"
             className="w-full bg-[#2c2c2e] border border-[#38383a] rounded-xl px-3 py-2 text-sm"
           />
@@ -162,21 +172,24 @@ export function ROView({
           <p className="text-[9px] text-[#8e8e93] mb-2">Pre-populated from scan (first block + multi-page). Edit as needed.</p>
 
           {ro.complaints && ro.complaints.length > 0 ? (
-            ro.complaints.map((c, idx) => (
-              <div key={idx} className="flex gap-2 mb-2 items-start">
-                <div className="mt-2 w-6 text-[#0a84ff] font-semibold text-sm shrink-0">
-                  {complaintLabel(ro.complaintLabels, idx)}.
+            ro.complaints.map((c, idx) => {
+              const label = complaintLabel(ro.complaintLabels, idx);
+              const stableId = ro.complaintIds?.[idx] ?? `cmp-${ro.id}-${label}`;
+              return (
+                <div key={stableId} className="flex gap-2 mb-2 items-start">
+                  <div className="mt-2 w-6 text-[#0a84ff] font-semibold text-sm shrink-0">{label}.</div>
+                  <StableTextarea
+                    fieldKey={stableId}
+                    value={c}
+                    onChange={(v) => onEditComplaint(idx, v)}
+                    className="bg-[#2c2c2e] border border-[#38383a] rounded-2xl px-3 py-2 text-sm min-h-[48px] resize-y"
+                  />
+                  <button onClick={() => onRemoveComplaint(idx)} className="mt-1 p-1.5 text-[#ff9f0a]" title="Remove complaint">
+                    <Trash2 size={16} />
+                  </button>
                 </div>
-                <textarea
-                  value={c}
-                  onChange={(e) => onEditComplaint(idx, e.target.value)}
-                  className="flex-1 bg-[#2c2c2e] border border-[#38383a] rounded-2xl px-3 py-2 text-sm min-h-[48px] resize-y"
-                />
-                <button onClick={() => onRemoveComplaint(idx)} className="mt-1 p-1.5 text-[#ff9f0a]" title="Remove complaint">
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))
+              );
+            })
           ) : (
             <div className="text-sm text-[#8e8e93] mb-2">No complaints extracted. Add or rescan.</div>
           )}
@@ -202,11 +215,11 @@ export function ROView({
         </button>
         {ro.xentryImages && ro.xentryImages.length > 0 && (
           <div className="grid grid-cols-4 gap-2 mb-2">
-            {ro.xentryImages.map((img, idx) => (
+            {ro.xentryImages.map((img) => (
               <img
-                key={idx}
+                key={img.id}
                 src={img.url}
-                className="w-full h-16 object-cover rounded border border-[#38383a]"
+                className="w-full h-16 object-cover rounded border border-[#38383a] cursor-pointer"
                 alt={img.name}
                 onClick={() => window.open(img.url)}
               />

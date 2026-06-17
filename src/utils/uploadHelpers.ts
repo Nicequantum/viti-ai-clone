@@ -1,8 +1,10 @@
 import { api } from '@/lib/api';
 import type { ImageAttachment } from '@/types';
+import { compressImageForUpload } from '@/utils/imageCompression';
 
 export async function uploadFileAsAttachment(file: File, idPrefix: string): Promise<ImageAttachment> {
-  const { pathname, url, name } = await api.uploadImage(file);
+  const compressed = await compressImageForUpload(file);
+  const { pathname, url, name } = await api.uploadImage(compressed);
   return {
     id: `${idPrefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     pathname,

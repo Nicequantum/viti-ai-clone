@@ -7,9 +7,11 @@ import { preprocessImageForOCR, runMultiPassOCR, runOCR } from '@/services/ocr';
 import type { AppView, ExtractedData, ImageAttachment, PendingImage, RepairLine, RepairOrder } from '@/types';
 import { emptyExtractedData, mergeExtracted, parseDiagnosticText } from '@/utils/diagnosticParser';
 import { getSuggestions } from '@/utils/mercedesKb';
+import { debounce } from '@/lib/debounce';
 import {
   createManualRepairOrder,
   createNewRepairLine,
+  ensureComplaintIds,
   syncRepairLinesWithComplaints,
 } from '@/utils/repairOrderFactory';
 import {
@@ -56,6 +58,11 @@ export function useRepairOrders({
   const scanCancelledRef = useRef(false);
   const scanInFlightRef = useRef(false);
   const scanSessionRef = useRef(0);
+  const roRef = useRef<RepairOrder | null>(null);
+
+  useEffect(() => {
+    roRef.current = currentRO;
+  }, [currentRO]);
 
   const refreshList = useCallback(async () => {
     const { repairOrders } = await api.listRepairOrders();
@@ -97,11 +104,12 @@ export function useRepairOrders({
     [allROs]
   );
 
-  const saveRO = useCallback(
+  const saveROImmediate = useCallback(
     async (ro: RepairOrder | null) => {
       if (ro) {
         try {
-          const saved = await persistRO(ro);
+          const saved = ensureComplaintIds(await persistRO(ro));
+          roRef.current = saved;
           setCurrentRO(saved);
           setAllROs((prev) => {
             const idx = prev.findIndex((r) => r.id === saved.id);
@@ -116,19 +124,52 @@ export function useRepairOrders({
           toast.error(e instanceof Error ? e.message : 'Failed to save repair order');
         }
       } else {
+        roRef.current = null;
         setCurrentRO(null);
       }
     },
     [persistRO]
   );
 
-  const getLatestRO = useCallback(
-    (ro?: RepairOrder | null) => {
-      const id = ro?.id || currentRO?.id;
-      if (!id) return ro || currentRO;
-      return allROs.find((r) => r.id === id) || ro || currentRO;
+  const debouncedPersistRef = useRef(
+    debounce((ro: RepairOrder) => {
+      void saveROImmediate(ro);
+    }, 450)
+  );
+
+  const flushPendingSave = useCallback(() => {
+    debouncedPersistRef.current.flush();
+  }, []);
+
+  const scheduleSaveRO = useCallback((ro: RepairOrder) => {
+    debouncedPersistRef.current(ro);
+  }, []);
+
+  const applyROUpdate = useCallback(
+    (updater: (ro: RepairOrder) => RepairOrder, options?: { immediate?: boolean }) => {
+      const base = roRef.current;
+      if (!base) return null;
+      const updated = ensureComplaintIds(structuredClone(updater(base)));
+      roRef.current = updated;
+      setCurrentRO(updated);
+      setAllROs((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+      if (options?.immediate) {
+        flushPendingSave();
+        void saveROImmediate(updated);
+      } else {
+        scheduleSaveRO(updated);
+      }
+      return updated;
     },
-    [allROs, currentRO]
+    [flushPendingSave, saveROImmediate, scheduleSaveRO]
+  );
+
+  const navigateView = useCallback(
+    (next: AppView) => {
+      flushPendingSave();
+      setView(next);
+    },
+    [flushPendingSave]
   );
 
   const deleteRO = useCallback(
@@ -150,11 +191,16 @@ export function useRepairOrders({
     [currentRO]
   );
 
-  const openRO = useCallback((ro: RepairOrder) => {
-    setCurrentRO(ro);
-    setCurrentLineId(null);
-    setView('ro');
-  }, []);
+  const openRO = useCallback(
+    (ro: RepairOrder) => {
+      const normalized = ensureComplaintIds(ro);
+      roRef.current = normalized;
+      setCurrentRO(normalized);
+      setCurrentLineId(null);
+      navigateView('ro');
+    },
+    [navigateView]
+  );
 
   const createROFromText = useCallback(async (text: string) => {
     const parsed = parseStructuredROText(text);
@@ -173,14 +219,15 @@ export function useRepairOrders({
         complaints,
         complaintLabels: parsed.complaintLabels,
       } as never);
+      roRef.current = ensureComplaintIds(repairOrder);
       setAllROs((prev) => [repairOrder, ...prev]);
       setCurrentRO(repairOrder);
-      setView('ro');
+      navigateView('ro');
       toast.success('Repair order created from scan');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to create repair order');
     }
-  }, []);
+  }, [navigateView]);
 
   const createROFromExtracted = useCallback(
     async (extracted: {
@@ -208,9 +255,10 @@ export function useRepairOrders({
           complaints,
           complaintLabels,
         } as never);
+        roRef.current = ensureComplaintIds(repairOrder);
         setAllROs((prev) => [repairOrder, ...prev]);
         setCurrentRO(repairOrder);
-        setView('ro');
+        navigateView('ro');
         toast.success('Repair order created from scan');
         return true;
       } catch (e) {
@@ -218,7 +266,7 @@ export function useRepairOrders({
         return false;
       }
     },
-    []
+    [navigateView]
   );
 
   const clearPendingPreviews = useCallback((images: PendingImage[]) => {
@@ -444,50 +492,40 @@ export function useRepairOrders({
     try {
       const draft = createManualRepairOrder();
       const { repairOrder } = await api.createRepairOrder(draft);
+      roRef.current = ensureComplaintIds(repairOrder);
       setAllROs((prev) => [repairOrder, ...prev]);
       setCurrentRO(repairOrder);
-      setView('ro');
+      navigateView('ro');
       toast.success('Manual repair order created');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to create repair order');
     }
-  }, []);
+  }, [navigateView]);
 
   const updateLine = useCallback(
     (lineId: string, updates: Partial<RepairLine>) => {
-      const latestRO = getLatestRO();
-      if (!latestRO) return;
-      const updatedLines = latestRO.repairLines.map((line) => (line.id === lineId ? { ...line, ...updates } : line));
-      const updated = { ...latestRO, repairLines: updatedLines };
-      setCurrentRO(updated);
-      setAllROs((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
-      saveRO(updated);
+      applyROUpdate((ro) => ({
+        ...ro,
+        repairLines: ro.repairLines.map((line) => (line.id === lineId ? { ...line, ...updates } : line)),
+      }));
     },
-    [getLatestRO, saveRO]
+    [applyROUpdate]
   );
 
   const updateVehicle = useCallback(
     (updates: Partial<RepairOrder['vehicle']>) => {
-      const latestRO = getLatestRO();
-      if (!latestRO) return;
-      const updated = { ...latestRO, vehicle: { ...latestRO.vehicle, ...updates } };
-      setCurrentRO(updated);
-      setAllROs((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
-      saveRO(updated);
+      const normalized = { ...updates };
+      if (normalized.vin !== undefined) normalized.vin = normalized.vin.toUpperCase();
+      applyROUpdate((ro) => ({ ...ro, vehicle: { ...ro.vehicle, ...normalized } }));
     },
-    [getLatestRO, saveRO]
+    [applyROUpdate]
   );
 
   const updateCustomer = useCallback(
     (name: string) => {
-      const latestRO = getLatestRO();
-      if (!latestRO) return;
-      const updated = { ...latestRO, customer: { ...latestRO.customer, name } };
-      setCurrentRO(updated);
-      setAllROs((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
-      saveRO(updated);
+      applyROUpdate((ro) => ({ ...ro, customer: { ...ro.customer, name } }));
     },
-    [getLatestRO, saveRO]
+    [applyROUpdate]
   );
 
   const nextComplaintLabel = useCallback((labels?: string[], count = 0) => {
@@ -501,69 +539,69 @@ export function useRepairOrders({
   }, []);
 
   const updateComplaints = useCallback(
-    (newComplaints: string[], newLabels?: string[]) => {
-      const latestRO = getLatestRO();
-      if (!latestRO) return;
-      const complaintLabels =
-        newLabels && newLabels.length === newComplaints.length ? newLabels : latestRO.complaintLabels;
-      const updatedLines = syncRepairLinesWithComplaints(
-        latestRO.repairLines,
-        newComplaints,
-        complaintLabels
-      );
-      const updated = { ...latestRO, complaints: newComplaints, complaintLabels, repairLines: updatedLines };
-      setCurrentRO(updated);
-      setAllROs((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
-      saveRO(updated);
+    (newComplaints: string[], newLabels?: string[], newIds?: string[]) => {
+      applyROUpdate((ro) => {
+        const complaintLabels =
+          newLabels && newLabels.length === newComplaints.length ? newLabels : ro.complaintLabels;
+        const labelsForIds =
+          complaintLabels ?? newComplaints.map((_, i) => String.fromCharCode(65 + i));
+        const complaintIds =
+          newIds && newIds.length === newComplaints.length
+            ? newIds
+            : labelsForIds.map((label, i) => ro.complaintIds?.[i] ?? `cmp-${ro.id}-${label}`);
+        const updatedLines = syncRepairLinesWithComplaints(ro.repairLines, newComplaints, complaintLabels);
+        return { ...ro, complaints: newComplaints, complaintLabels, complaintIds, repairLines: updatedLines };
+      });
     },
-    [getLatestRO, saveRO]
+    [applyROUpdate]
   );
 
   const addComplaint = useCallback(() => {
-    const latestRO = getLatestRO();
-    if (!latestRO) return;
-    const complaints = [...(latestRO.complaints || []), 'New concern - describe symptom'];
-    const labels = [...(latestRO.complaintLabels || latestRO.complaints.map((_, i) => String.fromCharCode(65 + i)))];
-    labels.push(nextComplaintLabel(labels, complaints.length - 1));
-    updateComplaints(complaints, labels);
-  }, [getLatestRO, nextComplaintLabel, updateComplaints]);
+    const ro = roRef.current;
+    if (!ro) return;
+    const complaints = [...(ro.complaints || []), 'New concern - describe symptom'];
+    const labels = [...(ro.complaintLabels || ro.complaints.map((_, i) => String.fromCharCode(65 + i)))];
+    const ids = [...(ro.complaintIds || labels.map((l) => `cmp-${ro.id}-${l}`))];
+    const nextLabel = nextComplaintLabel(labels, complaints.length - 1);
+    labels.push(nextLabel);
+    ids.push(`cmp-${ro.id}-${nextLabel}-${Date.now()}`);
+    updateComplaints(complaints, labels, ids);
+  }, [nextComplaintLabel, updateComplaints]);
 
   const removeComplaint = useCallback(
     (index: number) => {
-      const latestRO = getLatestRO();
-      if (!latestRO) return;
-      const complaints = (latestRO.complaints || []).filter((_, i) => i !== index);
-      const labels = latestRO.complaintLabels?.filter((_, i) => i !== index);
-      updateComplaints(complaints, labels);
+      const ro = roRef.current;
+      if (!ro) return;
+      updateComplaints(
+        (ro.complaints || []).filter((_, i) => i !== index),
+        ro.complaintLabels?.filter((_, i) => i !== index),
+        ro.complaintIds?.filter((_, i) => i !== index)
+      );
     },
-    [getLatestRO, updateComplaints]
+    [updateComplaints]
   );
 
   const editComplaint = useCallback(
     (index: number, value: string) => {
-      const latestRO = getLatestRO();
-      if (!latestRO) return;
-      const updated = [...(latestRO.complaints || [])];
+      const ro = roRef.current;
+      if (!ro) return;
+      const updated = [...(ro.complaints || [])];
       updated[index] = value;
-      updateComplaints(updated);
+      updateComplaints(updated, ro.complaintLabels, ro.complaintIds);
     },
-    [getLatestRO, updateComplaints]
+    [updateComplaints]
   );
 
   const updateRONumber = useCallback(
     (roNumber: string) => {
-      const latestRO = getLatestRO();
-      if (!latestRO) return;
-      const updated = { ...latestRO, roNumber: roNumber.trim() };
-      setCurrentRO(updated);
-      setAllROs((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
-      saveRO(updated);
+      applyROUpdate((ro) => ({ ...ro, roNumber: roNumber.trim() }));
     },
-    [getLatestRO, saveRO]
+    [applyROUpdate]
   );
 
   const decodeVinForRO = useCallback(async () => {
-    const latestRO = getLatestRO();
+    flushPendingSave();
+    const latestRO = roRef.current;
     if (!latestRO?.vehicle.vin || latestRO.vehicle.vin.length < 17) {
       toast.error('Enter a valid 17-character VIN first');
       return;
@@ -584,22 +622,25 @@ export function useRepairOrders({
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'VIN decode failed');
     }
-  }, [getLatestRO, updateVehicle]);
+  }, [flushPendingSave, updateVehicle]);
 
   const addRepairLine = useCallback(async () => {
-    const latestRO = getLatestRO();
+    flushPendingSave();
+    const latestRO = roRef.current;
     if (!latestRO) return;
     const newLine = createNewRepairLine(latestRO.repairLines.length + 1);
     const updated = { ...latestRO, repairLines: [...latestRO.repairLines, newLine] };
-    const saved = await persistRO(updated);
+    const saved = ensureComplaintIds(await persistRO(updated));
+    roRef.current = saved;
     setCurrentRO(saved);
+    setAllROs((prev) => prev.map((r) => (r.id === saved.id ? saved : r)));
     setCurrentLineId(saved.repairLines[saved.repairLines.length - 1].id);
-    setView('line');
-  }, [getLatestRO, persistRO]);
+    navigateView('line');
+  }, [flushPendingSave, navigateView, persistRO]);
 
   const applySmartDefaultsToLine = useCallback(
     (lineId: string) => {
-      const latestRO = getLatestRO();
+      const latestRO = roRef.current;
       if (!latestRO) return;
       const line = latestRO.repairLines.find((l) => l.id === lineId);
       if (!line) return;
@@ -610,7 +651,7 @@ export function useRepairOrders({
       updateLine(lineId, { technicianNotes: notes });
       toast.success('Reference notes added');
     },
-    [getLatestRO, updateLine]
+    [updateLine]
   );
 
   const processXentryImages = useCallback(
@@ -653,8 +694,9 @@ export function useRepairOrders({
       input.onchange = async (e) => {
         const files = Array.from((e.target as HTMLInputElement).files || []);
         if (files.length === 0 || !currentRO) return;
+        flushPendingSave();
         onOcrStart();
-        const latestRO = getLatestRO();
+        const latestRO = roRef.current;
         const lineForExtract = latestRO?.repairLines.find((l) => l.id === lineId);
         if (!latestRO || !lineForExtract) {
           onOcrFinish();
@@ -673,7 +715,7 @@ export function useRepairOrders({
               : l
           );
           const updated = { ...latestRO, repairLines: updatedLines };
-          await saveRO(updated);
+          await saveROImmediate(updated);
           const updatedLine = updatedLines.find((l) => l.id === lineId);
           if (updatedLine && (!updatedLine.technicianNotes || updatedLine.technicianNotes.trim().length < 5)) {
             setTimeout(() => applySmartDefaultsToLine(lineId), 60);
@@ -687,7 +729,7 @@ export function useRepairOrders({
       };
       input.click();
     },
-    [currentRO, getLatestRO, processXentryImages, saveRO, onOcrStart, onOcrFinish, applySmartDefaultsToLine]
+    [currentRO, flushPendingSave, processXentryImages, saveROImmediate, onOcrStart, onOcrFinish, applySmartDefaultsToLine]
   );
 
   const addROXentryPhotos = useCallback(() => {
@@ -700,8 +742,9 @@ export function useRepairOrders({
     input.onchange = async (e) => {
       const files = Array.from((e.target as HTMLInputElement).files || []);
       if (files.length === 0 || !currentRO) return;
+      flushPendingSave();
       onOcrStart();
-      const latestRO = getLatestRO();
+      const latestRO = roRef.current;
       if (!latestRO) {
         onOcrFinish();
         return;
@@ -727,7 +770,7 @@ export function useRepairOrders({
               : l
           );
         }
-        await saveRO({
+        await saveROImmediate({
           ...latestRO,
           xentryImages: result.allImages,
           xentryOcrTexts: result.updatedOcrTexts,
@@ -741,19 +784,23 @@ export function useRepairOrders({
       }
     };
     input.click();
-  }, [currentRO, getLatestRO, processXentryImages, saveRO, onOcrStart, onOcrFinish]);
+  }, [currentRO, flushPendingSave, processXentryImages, saveROImmediate, onOcrStart, onOcrFinish]);
 
   const generateStory = useCallback(
     async (lineId: string) => {
-      const latestRO = getLatestRO();
+      flushPendingSave();
+      const latestRO = roRef.current;
       if (!latestRO) return;
       setIsGenerating(true);
       try {
         const { warrantyStory } = await api.generateStory(latestRO.id, lineId);
-        const updatedLines = latestRO.repairLines.map((l) => (l.id === lineId ? { ...l, warrantyStory } : l));
-        const updated = { ...latestRO, repairLines: updatedLines };
-        setCurrentRO(updated);
-        setAllROs((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+        applyROUpdate(
+          (ro) => ({
+            ...ro,
+            repairLines: ro.repairLines.map((l) => (l.id === lineId ? { ...l, warrantyStory } : l)),
+          }),
+          { immediate: true }
+        );
         toast.success('Warranty story generated');
       } catch (error: unknown) {
         toast.error(error instanceof Error ? error.message : 'Story generation failed');
@@ -761,7 +808,7 @@ export function useRepairOrders({
         setIsGenerating(false);
       }
     },
-    [getLatestRO]
+    [applyROUpdate, flushPendingSave]
   );
 
   const currentLine = currentRO?.repairLines.find((l) => l.id === currentLineId);
@@ -777,9 +824,18 @@ export function useRepairOrders({
     )
     .sort((a, b) => ((b.createdAt || '0') > (a.createdAt || '0') ? 1 : -1));
 
+  const navigateToLine = useCallback(
+    (lineId: string) => {
+      flushPendingSave();
+      setCurrentLineId(lineId);
+      navigateView('line');
+    },
+    [flushPendingSave, navigateView]
+  );
+
   return {
     view,
-    setView,
+    setView: navigateView,
     currentRO,
     setCurrentRO,
     currentLineId,
@@ -794,7 +850,8 @@ export function useRepairOrders({
     setPendingROImages,
     isGenerating,
     filteredROs,
-    getLatestRO,
+    flushPendingSave,
+    navigateToLine,
     deleteRO,
     openRO,
     scanRO,

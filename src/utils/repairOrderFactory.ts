@@ -99,17 +99,29 @@ export function createRepairOrderFromScan(params: {
 }
 
 export function createManualRepairOrder(): RepairOrder {
+  const roId = 'ro-' + Date.now();
   return {
-    id: 'ro-' + Date.now(),
+    id: roId,
     roNumber: `R-${Date.now().toString().slice(-6)}`,
     vehicle: { vin: '', year: '', make: '', model: '', engine: '', mileageIn: '', mileageOut: '' },
     customer: { name: '' },
     complaints: ['Enter customer concern / symptom here (will label as A.)'],
+    complaintLabels: ['A'],
+    complaintIds: [`cmp-${roId}-A`],
     xentryImages: [],
     xentryOcrTexts: [],
     createdAt: new Date().toISOString(),
     repairLines: [defaultRepairLine()],
   };
+}
+
+export function ensureComplaintIds(ro: RepairOrder): RepairOrder {
+  const labels = ro.complaintLabels ?? ro.complaints.map((_, i) => String.fromCharCode(65 + i));
+  const ids =
+    ro.complaintIds && ro.complaintIds.length === ro.complaints.length
+      ? ro.complaintIds
+      : labels.map((label, i) => ro.complaintIds?.[i] ?? `cmp-${ro.id}-${label}`);
+  return { ...ro, complaintLabels: labels, complaintIds: ids };
 }
 
 export function createNewRepairLine(lineNumber: number): RepairLine {

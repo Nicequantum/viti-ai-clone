@@ -171,12 +171,7 @@ export function BenzTechApp() {
           onDecodeVin={ro.decodeVinForRO}
           onAddROXentryPhotos={ro.addROXentryPhotos}
           onAddRepairLine={ro.addRepairLine}
-          onOpenLine={(lineId) => {
-            const latest = ro.getLatestRO(ro.currentRO);
-            if (latest) ro.setCurrentRO(latest);
-            ro.setCurrentLineId(lineId);
-            ro.setView('line');
-          }}
+          onOpenLine={ro.navigateToLine}
           onDeleteRO={() => ro.deleteRO(ro.currentRO!.id)}
         />
       )}
@@ -188,11 +183,7 @@ export function BenzTechApp() {
           isProcessingOCR={ocr.isProcessingOCR}
           ocrProgress={ocr.ocrProgress}
           isGenerating={ro.isGenerating}
-          onBack={() => {
-            const latest = ro.getLatestRO(ro.currentRO);
-            if (latest) ro.setCurrentRO(latest);
-            ro.setView('ro');
-          }}
+          onBack={() => ro.setView('ro')}
           onUpdateLine={(updates) => ro.updateLine(ro.currentLine!.id, updates)}
           onAddXentryPhotos={() => ro.addXentryPhotos(ro.currentLine!.id)}
           onApplySmartDefaults={() => ro.applySmartDefaultsToLine(ro.currentLine!.id)}

@@ -2,6 +2,8 @@
 
 import { ArrowLeft, Camera, Copy, Download, RefreshCw, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import { StableInput } from '@/components/StableInput';
+import { StableTextarea } from '@/components/StableTextarea';
 import type { RepairLine, RepairOrder } from '@/types';
 import { WARRANTY_STORY_MAX_CHARS, WARRANTY_STORY_WARN_CHARS } from '@/types';
 import { getSuggestions } from '@/utils/mercedesKb';
@@ -92,19 +94,22 @@ export function LineView({
 
       <div className="mb-5">
         <div className="text-sm text-[#8e8e93]">LINE {line.lineNumber}</div>
-        <input
+        <StableInput
+          fieldKey={`${line.id}-description`}
           value={line.description}
-          onChange={(e) => onUpdateLine({ description: e.target.value })}
-          className="text-xl font-semibold bg-transparent w-full focus:outline-none"
+          onChange={(v) => onUpdateLine({ description: v })}
+          showVoice
+          className="text-xl font-semibold bg-transparent w-full focus:outline-none border-none"
         />
       </div>
 
       <div className="space-y-5">
         <div>
           <label className="text-xs uppercase tracking-widest text-[#8e8e93] block mb-1.5">CUSTOMER CONCERN (prefilled from scan)</label>
-          <textarea
+          <StableTextarea
+            fieldKey={`${line.id}-concern`}
             value={line.customerConcern}
-            onChange={(e) => onUpdateLine({ customerConcern: e.target.value })}
+            onChange={(v) => onUpdateLine({ customerConcern: v })}
             className="w-full bg-[#1c1c1e] border border-[#38383a] rounded-2xl p-3.5 text-sm min-h-[80px]"
             placeholder="Customer stated..."
           />
@@ -112,9 +117,10 @@ export function LineView({
 
         <div>
           <label className="text-xs uppercase tracking-widest text-[#8e8e93] block mb-1.5">TECHNICIAN NOTES + FINDINGS</label>
-          <textarea
+          <StableTextarea
+            fieldKey={`${line.id}-notes`}
             value={line.technicianNotes}
-            onChange={(e) => onUpdateLine({ technicianNotes: e.target.value })}
+            onChange={(v) => onUpdateLine({ technicianNotes: v })}
             className="w-full bg-[#1c1c1e] border border-[#38383a] rounded-2xl p-3.5 text-sm min-h-[100px]"
             placeholder="Document actual test results, findings, and repair steps performed..."
           />
@@ -207,10 +213,11 @@ export function LineView({
             {storyLen > WARRANTY_STORY_MAX_CHARS && (
               <div className="text-[10px] text-[#ff3b30] mb-2">Exceeds recommended DMS character limit — edit before submission.</div>
             )}
-            <textarea
+            <StableTextarea
+              fieldKey={`${line.id}-story`}
               value={line.warrantyStory}
-              onChange={(e) => onUpdateLine({ warrantyStory: e.target.value })}
-              className="w-full bg-[#1c1c1e] rounded p-3 text-[14.5px] leading-relaxed mb-3 min-h-[200px] resize-y"
+              onChange={(v) => onUpdateLine({ warrantyStory: v })}
+              className="w-full bg-[#1c1c1e] border border-[#38383a] rounded p-3 text-[14.5px] leading-relaxed mb-3 min-h-[200px] resize-y"
               placeholder="Edit warranty story before DMS submission..."
             />
             <div className="flex gap-2 flex-wrap">

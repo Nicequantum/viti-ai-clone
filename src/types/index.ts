@@ -67,6 +67,8 @@ export interface RepairOrder {
   complaints: string[];
   /** Original RO line letters (A, B, C, E, F…) when extracted from scan; falls back to index order. */
   complaintLabels?: string[];
+  /** Stable React keys for complaint textareas — prevents remount loops during edits. */
+  complaintIds?: string[];
   serviceAdvisor?: ServiceAdvisorSummary;
   serviceAdvisorName?: string;
   xentryImages?: ImageAttachment[];
