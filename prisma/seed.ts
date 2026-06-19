@@ -1,121 +1,14 @@
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
-import { internalEmailForD7 } from '../src/lib/d7Number';
-import { seedTemplateLibraryIfEmpty } from '../src/lib/templateLibrary';
+import { runDatabaseSeed } from '../src/lib/seedDatabase';
 
 const prisma = new PrismaClient();
 
-function requireEnv(name: string, minLength = 1): string {
-  const value = process.env[name]?.trim();
-  if (!value || value.length < minLength) {
-    throw new Error(
-      `${name} must be set${minLength > 1 ? ` (min ${minLength} characters)` : ''} before running db:seed.`
-    );
-  }
-  return value;
-}
-
 async function main() {
-  const managerD7 = (process.env.ADMIN_SEED_D7?.trim() || 'D7HARRIH').toUpperCase();
-  const techD7 = (process.env.TECH_SEED_D7?.trim() || 'D7TECH001').toUpperCase();
-  const managerPassword = requireEnv('ADMIN_SEED_PASSWORD', 8);
-  const techPassword = process.env.TECH_SEED_PASSWORD?.trim() || 'changeme123';
-
-  const dealership = await prisma.dealership.upsert({
-    where: { id: 'seed-dealership' },
-    update: { name: 'Mercedes-Benz of Tiverton' },
-    create: {
-      id: 'seed-dealership',
-      name: 'Mercedes-Benz of Tiverton',
-    },
-  });
-
-  const managerPasswordHash = await bcrypt.hash(managerPassword, 12);
-  const techPasswordHash = await bcrypt.hash(techPassword, 12);
-
-  const legacyManagerEmail = (process.env.ADMIN_SEED_EMAIL?.trim() || 'admin@dealership.com').toLowerCase();
-  const legacyTechEmail = (process.env.TECH_SEED_EMAIL?.trim() || 'tech@dealership.com').toLowerCase();
-
-  const legacyManager = await prisma.technician.findFirst({ where: { email: legacyManagerEmail } });
-  if (legacyManager && legacyManager.d7Number !== managerD7) {
-    await prisma.technician.update({
-      where: { id: legacyManager.id },
-      data: {
-        d7Number: managerD7,
-        email: internalEmailForD7(managerD7),
-        passwordHash: managerPasswordHash,
-        role: 'manager',
-        isActive: true,
-        dealershipId: dealership.id,
-      },
-    });
-  } else {
-    await prisma.technician.upsert({
-      where: { d7Number: managerD7 },
-      update: {
-        passwordHash: managerPasswordHash,
-        role: 'manager',
-        isActive: true,
-        dealershipId: dealership.id,
-        email: internalEmailForD7(managerD7),
-      },
-      create: {
-        d7Number: managerD7,
-        email: internalEmailForD7(managerD7),
-        name: 'Service Manager',
-        passwordHash: managerPasswordHash,
-        role: 'manager',
-        isActive: true,
-        dealershipId: dealership.id,
-        consentAt: new Date(),
-        consentVersion: '2026-06-07-v1',
-      },
-    });
-  }
-
-  const legacyTech = await prisma.technician.findFirst({ where: { email: legacyTechEmail } });
-  if (legacyTech && legacyTech.d7Number !== techD7) {
-    await prisma.technician.update({
-      where: { id: legacyTech.id },
-      data: {
-        d7Number: techD7,
-        email: internalEmailForD7(techD7),
-        passwordHash: techPasswordHash,
-        role: 'technician',
-        isActive: true,
-        dealershipId: dealership.id,
-      },
-    });
-  } else {
-    await prisma.technician.upsert({
-      where: { d7Number: techD7 },
-      update: {
-        passwordHash: techPasswordHash,
-        role: 'technician',
-        isActive: true,
-        dealershipId: dealership.id,
-        email: internalEmailForD7(techD7),
-      },
-      create: {
-        d7Number: techD7,
-        email: internalEmailForD7(techD7),
-        name: 'Alex Technician',
-        passwordHash: techPasswordHash,
-        role: 'technician',
-        isActive: true,
-        dealershipId: dealership.id,
-        consentAt: new Date(),
-        consentVersion: '2026-06-07-v1',
-      },
-    });
-  }
-
-  const library = await seedTemplateLibraryIfEmpty();
-  console.log(`  Template library: ${library.templates} templates, ${library.knowledgeBase} knowledge-base entries`);
-
+  const result = await runDatabaseSeed();
+  console.log(`  Template library: ${result.templates} templates, ${result.knowledgeBase} knowledge-base entries`);
   console.log('Seed complete.');
-  console.log(`  ${managerD7} (manager) — password from ADMIN_SEED_PASSWORD`);
-  console.log(`  ${techD7} (technician) — password from TECH_SEED_PASSWORD or default changeme123`);
+  console.log(`  ${result.managerD7} (manager) — password from ADMIN_SEED_PASSWORD`);
+  console.log(`  ${result.techD7} (technician) — password from TECH_SEED_PASSWORD or default changeme123`);
 }
 
 main()
