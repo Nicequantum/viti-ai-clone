@@ -20,6 +20,7 @@ model Dealership {
 
 model Technician {
   id             String        @id @default(cuid())
+  d7Number       String        @unique
   email          String        @unique
   name           String
   passwordHash   String

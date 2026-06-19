@@ -16,10 +16,10 @@ export async function POST(request: Request) {
       return apiError(VALIDATION_ERROR, 400);
     }
 
-    const { email, password } = parsed.data;
-    const session = await loginTechnician(email, password);
+    const { d7Number, password } = parsed.data;
+    const session = await loginTechnician(d7Number, password);
     if (!session) {
-      return apiError('Invalid email or password.', 401);
+      return apiError('Invalid D7 number or password.', 401);
     }
 
     const token = await createSessionToken(session);

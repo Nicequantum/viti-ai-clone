@@ -1,6 +1,7 @@
 import { writeAuditLog } from '@/lib/audit';
 import { withAuth } from '@/lib/apiRoute';
 import { hashPassword } from '@/lib/auth';
+import { internalEmailForD7 } from '@/lib/d7Number';
 import { prisma } from '@/lib/db';
 import { apiError, VALIDATION_ERROR } from '@/lib/errors';
 import { getRequestIp } from '@/lib/rate-limit';
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
         where: { dealershipId: session.dealershipId },
         select: {
           id: true,
-          email: true,
+          d7Number: true,
           name: true,
           role: true,
           isActive: true,
@@ -46,18 +47,18 @@ export async function POST(request: Request) {
         return apiError(VALIDATION_ERROR, 400);
       }
 
-      const { email, name, password, role } = parsed.data;
-      const normalizedEmail = email.toLowerCase().trim();
+      const { d7Number, name, password, role } = parsed.data;
 
-      const existing = await prisma.technician.findUnique({ where: { email: normalizedEmail } });
+      const existing = await prisma.technician.findUnique({ where: { d7Number } });
       if (existing) {
-        return apiError('An account with this email already exists.', 409);
+        return apiError('An account with this D7 number already exists.', 409);
       }
 
       const passwordHash = await hashPassword(password);
       const user = await prisma.technician.create({
         data: {
-          email: normalizedEmail,
+          d7Number,
+          email: internalEmailForD7(d7Number),
           name: name.trim(),
           passwordHash,
           role,
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
         },
         select: {
           id: true,
-          email: true,
+          d7Number: true,
           name: true,
           role: true,
           isActive: true,
@@ -80,7 +81,7 @@ export async function POST(request: Request) {
         technicianId: session.technicianId,
         entityType: 'technician',
         entityId: user.id,
-        metadata: { email: user.email, role: user.role },
+        metadata: { d7Number: user.d7Number, role: user.role },
         ipAddress: getRequestIp(request),
       });
 

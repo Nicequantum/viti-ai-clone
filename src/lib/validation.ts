@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { d7NumberField } from './d7Number';
 import {
   sanitizeComplaintSlots,
   sanitizeIdentifier,
@@ -13,7 +14,7 @@ const safeId = (max: number) => z.string().max(max).transform(sanitizeIdentifier
 const safeIdOptional = (max: number) => z.string().max(max).transform(sanitizeIdentifier).optional();
 
 export const loginSchema = z.object({
-  email: z.string().email().max(255).transform((v) => v.toLowerCase().trim()),
+  d7Number: d7NumberField,
   password: z.string().min(1).max(128),
 });
 
@@ -119,7 +120,7 @@ export const resolveAdvisorSchema = z.object({
 });
 
 export const createUserSchema = z.object({
-  email: z.string().email().max(255).transform((v) => v.toLowerCase().trim()),
+  d7Number: d7NumberField,
   name: safeText(100),
   password: z.string().min(8).max(128),
   role: z.enum(['technician', 'manager']).default('technician'),

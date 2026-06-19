@@ -27,8 +27,8 @@ export function useSession() {
     refresh();
   }, [refresh]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const { session: s } = await api.login(email, password);
+  const login = useCallback(async (d7Number: string, password: string) => {
+    const { session: s } = await api.login(d7Number, password);
     setSession(s);
     return s;
   }, []);

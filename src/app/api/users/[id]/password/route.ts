@@ -40,7 +40,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         technicianId: session.technicianId,
         entityType: 'technician',
         entityId: user.id,
-        metadata: { email: user.email },
+        metadata: { d7Number: user.d7Number },
         ipAddress: getRequestIp(request),
       });
 

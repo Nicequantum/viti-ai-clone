@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, Building2, KeyRound, LogOut, ScrollText, Shield, User, UserPlus, UserRound, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, type TechnicianUser } from '@/lib/api';
+import { generateTemporaryPassword } from '@/lib/passwordGenerator';
+import { copyPlainTextToClipboard } from '@/utils/pdfExport';
 import type { TechnicianSession } from '@/types';
 import { DealershipBranding } from '@/components/DealershipBranding';
 import { CONSENT_VERSION } from '@/types';
@@ -21,7 +23,17 @@ export function SettingsView({ session, onBack, onLogout, onOpenAuditLogs, onOpe
   const [usersLoading, setUsersLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [newUser, setNewUser] = useState({ email: '', name: '', password: '', role: 'technician' as 'technician' | 'manager' });
+  const [newUser, setNewUser] = useState({
+    d7Number: '',
+    name: '',
+    password: '',
+    role: 'technician' as 'technician' | 'manager',
+  });
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    d7Number: string;
+    password: string;
+    name: string;
+  } | null>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
@@ -80,15 +92,39 @@ export function SettingsView({ session, onBack, onLogout, onOpenAuditLogs, onOpe
     e.preventDefault();
     setCreating(true);
     try {
-      await api.createUser(newUser);
+      const payload = {
+        ...newUser,
+        d7Number: newUser.d7Number.trim().toUpperCase(),
+      };
+      await api.createUser(payload);
+      setCreatedCredentials({
+        d7Number: payload.d7Number,
+        password: payload.password,
+        name: payload.name,
+      });
       toast.success('Technician account created');
-      setNewUser({ email: '', name: '', password: '', role: 'technician' });
+      setNewUser({ d7Number: '', name: '', password: '', role: 'technician' });
       setShowCreateForm(false);
       await loadUsers();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create user');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleCopyCredentials = async () => {
+    if (!createdCredentials) return;
+    try {
+      const text = [
+        `Benz Tech login for ${createdCredentials.name}`,
+        `D7: ${createdCredentials.d7Number}`,
+        `Password: ${createdCredentials.password}`,
+      ].join('\n');
+      await copyPlainTextToClipboard(text);
+      toast.success('Login credentials copied');
+    } catch {
+      toast.error('Could not copy credentials');
     }
   };
 
@@ -132,7 +168,7 @@ export function SettingsView({ session, onBack, onLogout, onOpenAuditLogs, onOpe
           </div>
           <div>
             <div className="font-semibold">{session.name}</div>
-            <div className="text-xs text-[#8e8e93]">{session.email}</div>
+            <div className="text-xs text-[#8e8e93] font-mono">{session.d7Number}</div>
             <div className="text-[10px] text-[#666] capitalize">{session.role}</div>
           </div>
         </div>
@@ -236,6 +272,22 @@ export function SettingsView({ session, onBack, onLogout, onOpenAuditLogs, onOpe
             </button>
           </div>
 
+          {createdCredentials && (
+            <div className="mb-4 ios-card p-3 border border-[#30d158]/40 bg-[#30d158]/10">
+              <div className="text-xs font-semibold text-[#30d158] mb-1">Account ready — share with {createdCredentials.name}</div>
+              <div className="text-sm font-mono">D7: {createdCredentials.d7Number}</div>
+              <div className="text-sm font-mono break-all">Password: {createdCredentials.password}</div>
+              <div className="flex gap-2 mt-2">
+                <button type="button" onClick={() => void handleCopyCredentials()} className="text-[10px] text-[#0a84ff]">
+                  COPY CREDENTIALS
+                </button>
+                <button type="button" onClick={() => setCreatedCredentials(null)} className="text-[10px] text-[#8e8e93]">
+                  DISMISS
+                </button>
+              </div>
+            </div>
+          )}
+
           {showCreateForm && (
             <form onSubmit={handleCreateUser} className="mb-4 space-y-2 border-b border-[#38383a] pb-4">
               <input
@@ -247,22 +299,34 @@ export function SettingsView({ session, onBack, onLogout, onOpenAuditLogs, onOpe
                 required
               />
               <input
-                type="email"
-                placeholder="Email"
-                value={newUser.email}
-                onChange={(e) => setNewUser((u) => ({ ...u, email: e.target.value }))}
-                className="w-full bg-[#1c1c1e] rounded px-3 py-2 text-sm"
+                type="text"
+                placeholder="D7 number (e.g. D7HARRIH)"
+                value={newUser.d7Number}
+                onChange={(e) => setNewUser((u) => ({ ...u, d7Number: e.target.value.toUpperCase() }))}
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                className="w-full bg-[#1c1c1e] rounded px-3 py-2 text-sm font-mono uppercase"
                 required
               />
-              <input
-                type="password"
-                placeholder="Password (min 8 characters)"
-                value={newUser.password}
-                onChange={(e) => setNewUser((u) => ({ ...u, password: e.target.value }))}
-                className="w-full bg-[#1c1c1e] rounded px-3 py-2 text-sm"
-                minLength={8}
-                required
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Password (min 8 characters)"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser((u) => ({ ...u, password: e.target.value }))}
+                  className="flex-1 bg-[#1c1c1e] rounded px-3 py-2 text-sm font-mono"
+                  minLength={8}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setNewUser((u) => ({ ...u, password: generateTemporaryPassword() }))}
+                  className="secondary-btn px-3 text-[10px] whitespace-nowrap"
+                >
+                  GENERATE
+                </button>
+              </div>
               <select
                 value={newUser.role}
                 onChange={(e) => setNewUser((u) => ({ ...u, role: e.target.value as 'technician' | 'manager' }))}
@@ -289,7 +353,7 @@ export function SettingsView({ session, onBack, onLogout, onOpenAuditLogs, onOpe
                     <div>
                       <div className="text-sm font-medium">{user.name}</div>
                       <div className="text-[10px] text-[#8e8e93]">
-                        {user.email} · {user.role}
+                        {user.d7Number} · {user.role}
                         {!user.isActive && <span className="text-[#ff3b30] ml-1">(deactivated)</span>}
                       </div>
                     </div>

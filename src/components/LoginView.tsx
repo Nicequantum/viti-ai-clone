@@ -6,7 +6,7 @@ import { DealershipBranding } from '@/components/DealershipBranding';
 import { toast } from 'sonner';
 
 interface LoginViewProps {
-  onLogin: (email: string, password: string) => Promise<unknown>;
+  onLogin: (d7Number: string, password: string) => Promise<unknown>;
 }
 
 interface SecurityStatus {
@@ -15,7 +15,7 @@ interface SecurityStatus {
 }
 
 export function LoginView({ onLogin }: LoginViewProps) {
-  const [email, setEmail] = useState('');
+  const [d7Number, setD7Number] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [securityStatus, setSecurityStatus] = useState<SecurityStatus | null>(null);
@@ -33,7 +33,7 @@ export function LoginView({ onLogin }: LoginViewProps) {
     e.preventDefault();
     setLoading(true);
     try {
-      await onLogin(email, password);
+      await onLogin(d7Number.trim().toUpperCase(), password);
       toast.success('Signed in');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Login failed');
@@ -71,14 +71,17 @@ export function LoginView({ onLogin }: LoginViewProps) {
 
         <form onSubmit={handleSubmit} className="ios-card p-6 space-y-4">
           <div>
-            <label className="text-xs text-[#8e8e93] block mb-1">Technician Email</label>
+            <label className="text-xs text-[#8e8e93] block mb-1">Mercedes-Benz D7 Number</label>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="tech@dealership.com"
+              type="text"
+              value={d7Number}
+              onChange={(e) => setD7Number(e.target.value.toUpperCase())}
+              placeholder="D7HARRIH"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
               required
-              className="w-full bg-[#2c2c2e] border border-[#38383a] rounded-xl px-4 py-3 text-sm"
+              className="w-full bg-[#2c2c2e] border border-[#38383a] rounded-xl px-4 py-3 text-sm font-mono tracking-wide uppercase"
             />
           </div>
           <div>

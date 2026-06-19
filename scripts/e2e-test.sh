@@ -44,7 +44,8 @@ rm -f "$COOKIE_JAR"
 
 log "1. Manager login"
 : "${ADMIN_SEED_PASSWORD:?Set ADMIN_SEED_PASSWORD before running e2e tests}"
-RESP=$(api POST /api/auth/login "{\"email\":\"admin@dealership.com\",\"password\":\"${ADMIN_SEED_PASSWORD}\"}")
+ADMIN_SEED_D7="${ADMIN_SEED_D7:-D7HARRIH}"
+RESP=$(api POST /api/auth/login "{\"d7Number\":\"${ADMIN_SEED_D7}\",\"password\":\"${ADMIN_SEED_PASSWORD}\"}")
 BODY=$(check_http "$RESP" 200 "Manager login")
 echo "$BODY" | grep -q '"role":"manager"' && pass "Manager role in session" || fail "Manager role missing"
 
@@ -63,7 +64,7 @@ check_http "$RESP" 200 "Manager logout" > /dev/null
 rm -f "$COOKIE_JAR"
 
 log "5. Technician login"
-RESP=$(api POST /api/auth/login '{"email":"tech@dealership.com","password":"changeme123"}')
+RESP=$(api POST /api/auth/login '{"d7Number":"D7TECH001","password":"changeme123"}')
 BODY=$(check_http "$RESP" 200 "Technician login")
 echo "$BODY" | grep -q '"role":"technician"' && pass "Technician role in session" || fail "Technician role missing"
 
@@ -163,7 +164,7 @@ fi
 
 log "12. Invalid login returns safe error"
 rm -f "$COOKIE_JAR"
-RESP=$(api POST /api/auth/login '{"email":"tech@dealership.com","password":"wrongpassword"}')
+RESP=$(api POST /api/auth/login '{"d7Number":"D7TECH001","password":"wrongpassword"}')
 BODY=$(check_http "$RESP" 401 "Invalid login rejected")
 echo "$BODY" | grep -q 'SESSION_SECRET\|prisma\|Error:' && fail "Raw error leaked to client" || pass "No raw error in login response"
 

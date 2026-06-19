@@ -4,10 +4,10 @@ import { prisma } from './db';
 /** Known default password used for the technician seed account when TECH_SEED_PASSWORD is unset. */
 export const DEFAULT_TECH_SEED_PASSWORD = 'changeme123';
 
-function getSeedAccountEmails(): { managerEmail: string; techEmail: string } {
+function getSeedD7Numbers(): { managerD7: string; techD7: string } {
   return {
-    managerEmail: process.env.ADMIN_SEED_EMAIL?.trim() || 'admin@dealership.com',
-    techEmail: process.env.TECH_SEED_EMAIL?.trim() || 'tech@dealership.com',
+    managerD7: (process.env.ADMIN_SEED_D7?.trim() || 'D7HARRIH').toUpperCase(),
+    techD7: (process.env.TECH_SEED_D7?.trim() || 'D7TECH001').toUpperCase(),
   };
 }
 
@@ -18,22 +18,22 @@ export interface SeedSecurityStatus {
 }
 
 export async function checkSeedPasswordSecurity(): Promise<SeedSecurityStatus> {
-  const { managerEmail, techEmail } = getSeedAccountEmails();
+  const { managerD7, techD7 } = getSeedD7Numbers();
   const techSeedPassword = process.env.TECH_SEED_PASSWORD?.trim() || DEFAULT_TECH_SEED_PASSWORD;
 
   const accounts = await prisma.technician.findMany({
-    where: { email: { in: [managerEmail, techEmail] } },
-    select: { email: true, passwordHash: true, role: true },
+    where: { d7Number: { in: [managerD7, techD7] } },
+    select: { d7Number: true, passwordHash: true, role: true },
   });
 
   const accountsUsingDefaults: string[] = [];
   const warnings: string[] = [];
 
   for (const account of accounts) {
-    if (account.email === techEmail) {
+    if (account.d7Number === techD7) {
       const matchesTechSeed = await verifyPassword(techSeedPassword, account.passwordHash);
       if (matchesTechSeed) {
-        accountsUsingDefaults.push(account.email);
+        accountsUsingDefaults.push(account.d7Number);
         warnings.push(
           techSeedPassword === DEFAULT_TECH_SEED_PASSWORD
             ? 'Technician seed account still uses the default password (changeme123).'
@@ -42,12 +42,12 @@ export async function checkSeedPasswordSecurity(): Promise<SeedSecurityStatus> {
       }
     }
 
-    if (account.email === managerEmail) {
+    if (account.d7Number === managerD7) {
       const adminSeedPassword = process.env.ADMIN_SEED_PASSWORD;
       if (adminSeedPassword) {
         const matchesSeed = await verifyPassword(adminSeedPassword, account.passwordHash);
         if (matchesSeed) {
-          accountsUsingDefaults.push(account.email);
+          accountsUsingDefaults.push(account.d7Number);
           warnings.push(
             'Manager account password matches ADMIN_SEED_PASSWORD — change it before production use.'
           );
@@ -56,7 +56,7 @@ export async function checkSeedPasswordSecurity(): Promise<SeedSecurityStatus> {
 
       const stillDefaultTech = await verifyPassword(DEFAULT_TECH_SEED_PASSWORD, account.passwordHash);
       if (stillDefaultTech) {
-        accountsUsingDefaults.push(account.email);
+        accountsUsingDefaults.push(account.d7Number);
         warnings.push('Manager account still uses a known default password.');
       }
     }

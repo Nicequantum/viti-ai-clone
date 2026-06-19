@@ -230,7 +230,7 @@ export interface MercedesSuggestions {
 
 export interface TechnicianSession {
   technicianId: string;
-  email: string;
+  d7Number: string;
   name: string;
   role: string;
   dealershipId: string;

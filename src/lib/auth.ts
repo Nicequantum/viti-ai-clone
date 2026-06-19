@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
+import { normalizeD7Number } from './d7Number';
 import { prisma } from './db';
 import { logger } from './logger';
 
@@ -9,7 +10,7 @@ const SESSION_MAX_AGE = 60 * 60 * 12; // 12 hours
 
 export interface SessionPayload {
   technicianId: string;
-  email: string;
+  d7Number: string;
   name: string;
   role: string;
   dealershipId: string;
@@ -100,7 +101,7 @@ async function resolveSessionPayload(tokenPayload: SessionPayload): Promise<Sess
 
   return {
     technicianId: tech.id,
-    email: tech.email,
+    d7Number: tech.d7Number,
     name: tech.name,
     role: tech.role,
     dealershipId: tech.dealershipId,
@@ -159,10 +160,10 @@ export async function revokeTechnicianSessions(technicianId: string): Promise<vo
   await incrementSessionVersion(technicianId);
 }
 
-export async function loginTechnician(email: string, password: string): Promise<SessionPayload | null> {
-  const normalizedEmail = email.toLowerCase().trim();
-  const tech = await prisma.technician.findFirst({
-    where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+export async function loginTechnician(d7Number: string, password: string): Promise<SessionPayload | null> {
+  const normalizedD7 = normalizeD7Number(d7Number);
+  const tech = await prisma.technician.findUnique({
+    where: { d7Number: normalizedD7 },
     include: { dealership: true },
   });
   if (!tech || !tech.isActive) return null;
@@ -170,7 +171,7 @@ export async function loginTechnician(email: string, password: string): Promise<
   if (!valid) return null;
   return {
     technicianId: tech.id,
-    email: tech.email,
+    d7Number: tech.d7Number,
     name: tech.name,
     role: tech.role,
     dealershipId: tech.dealershipId,

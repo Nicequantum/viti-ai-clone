@@ -50,10 +50,11 @@ describe('tenant isolation (route handlers)', () => {
     dealershipBId = dealershipB.id;
 
     const techA = await prisma.technician.upsert({
-      where: { email: 'tenant-a@dealership.com' },
+      where: { d7Number: 'D7TENANTA' },
       update: { dealershipId: dealershipAId },
       create: {
-        email: 'tenant-a@dealership.com',
+        d7Number: 'D7TENANTA',
+        email: 'd7tenanta@benz-tech.local',
         name: 'Tenant Tech A',
         passwordHash,
         role: 'technician',
@@ -66,10 +67,11 @@ describe('tenant isolation (route handlers)', () => {
     techAId = techA.id;
 
     const techB = await prisma.technician.upsert({
-      where: { email: 'tenant-b@dealership.com' },
+      where: { d7Number: 'D7TENANTB' },
       update: { dealershipId: dealershipBId },
       create: {
-        email: 'tenant-b@dealership.com',
+        d7Number: 'D7TENANTB',
+        email: 'd7tenantb@benz-tech.local',
         name: 'Tenant Tech B',
         passwordHash,
         role: 'technician',
@@ -82,10 +84,11 @@ describe('tenant isolation (route handlers)', () => {
     techBId = techB.id;
 
     const managerB = await prisma.technician.upsert({
-      where: { email: 'tenant-manager-b@dealership.com' },
+      where: { d7Number: 'D7TENMGRB' },
       update: { dealershipId: dealershipBId },
       create: {
-        email: 'tenant-manager-b@dealership.com',
+        d7Number: 'D7TENMGRB',
+        email: 'd7tenmgrb@benz-tech.local',
         name: 'Tenant Manager B',
         passwordHash,
         role: 'manager',
@@ -97,10 +100,11 @@ describe('tenant isolation (route handlers)', () => {
     });
 
     const techNoConsent = await prisma.technician.upsert({
-      where: { email: 'tenant-no-consent@dealership.com' },
+      where: { d7Number: 'D7TENNOCN' },
       update: { dealershipId: dealershipAId, consentAt: null, consentVersion: null },
       create: {
-        email: 'tenant-no-consent@dealership.com',
+        d7Number: 'D7TENNOCN',
+        email: 'd7tennocn@benz-tech.local',
         name: 'Tenant No Consent',
         passwordHash,
         role: 'technician',
@@ -113,7 +117,7 @@ describe('tenant isolation (route handlers)', () => {
 
     techAToken = await createSessionToken({
       technicianId: techA.id,
-      email: techA.email,
+      d7Number: techA.d7Number,
       name: techA.name,
       role: techA.role,
       dealershipId: dealershipAId,
@@ -124,7 +128,7 @@ describe('tenant isolation (route handlers)', () => {
 
     techBToken = await createSessionToken({
       technicianId: techB.id,
-      email: techB.email,
+      d7Number: techB.d7Number,
       name: techB.name,
       role: techB.role,
       dealershipId: dealershipBId,
@@ -135,7 +139,7 @@ describe('tenant isolation (route handlers)', () => {
 
     managerBToken = await createSessionToken({
       technicianId: managerB.id,
-      email: managerB.email,
+      d7Number: managerB.d7Number,
       name: managerB.name,
       role: managerB.role,
       dealershipId: dealershipBId,
@@ -146,7 +150,7 @@ describe('tenant isolation (route handlers)', () => {
 
     techNoConsentToken = await createSessionToken({
       technicianId: techNoConsent.id,
-      email: techNoConsent.email,
+      d7Number: techNoConsent.d7Number,
       name: techNoConsent.name,
       role: techNoConsent.role,
       dealershipId: dealershipAId,
@@ -220,13 +224,8 @@ describe('tenant isolation (route handlers)', () => {
     });
     await prisma.technician.deleteMany({
       where: {
-        email: {
-          in: [
-            'tenant-a@dealership.com',
-            'tenant-b@dealership.com',
-            'tenant-manager-b@dealership.com',
-            'tenant-no-consent@dealership.com',
-          ],
+        d7Number: {
+          in: ['D7TENANTA', 'D7TENANTB', 'D7TENMGRB', 'D7TENNOCN'],
         },
       },
     });

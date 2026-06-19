@@ -35,9 +35,9 @@ describe('RO → story generation integration', () => {
       return originalFetch(input, init);
     }) as typeof fetch;
 
-    const techEmail = process.env.TECH_SEED_EMAIL?.trim() || 'tech@dealership.com';
+    const techD7 = process.env.TECH_SEED_D7?.trim() || 'D7TECH001';
     const techPassword = process.env.TECH_SEED_PASSWORD?.trim() || 'changeme123';
-    const session = await loginTechnician(techEmail, techPassword);
+    const session = await loginTechnician(techD7, techPassword);
     assert.ok(session, 'Seed technician must exist — run npm run db:seed first');
     technicianId = session.technicianId;
     dealershipId = session.dealershipId;

@@ -19,7 +19,7 @@ import { DIAGNOSTIC_EXTRACT_CLIENT_MS, RO_EXTRACT_CLIENT_MS } from '@/lib/timeou
 
 export interface TechnicianUser {
   id: string;
-  email: string;
+  d7Number: string;
   name: string;
   role: string;
   isActive: boolean;
@@ -86,10 +86,10 @@ async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
 }
 
 export const api = {
-  login: (email: string, password: string) =>
+  login: (d7Number: string, password: string) =>
     apiFetch<{ session: TechnicianSession }>('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ d7Number, password }),
     }),
 
   logout: () => apiFetch<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
@@ -223,7 +223,7 @@ export const api = {
 
   listUsers: () => apiFetch<{ users: TechnicianUser[] }>('/api/users'),
 
-  createUser: (data: { email: string; name: string; password: string; role: 'technician' | 'manager' }) =>
+  createUser: (data: { d7Number: string; name: string; password: string; role: 'technician' | 'manager' }) =>
     apiFetch<{ user: TechnicianUser }>('/api/users', {
       method: 'POST',
       body: JSON.stringify(data),

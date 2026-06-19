@@ -35,7 +35,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         data: { isActive: parsed.data.isActive },
         select: {
           id: true,
-          email: true,
+          d7Number: true,
           name: true,
           role: true,
           isActive: true,
@@ -53,7 +53,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         technicianId: session.technicianId,
         entityType: 'technician',
         entityId: updated.id,
-        metadata: { email: updated.email },
+        metadata: { d7Number: updated.d7Number },
         ipAddress: getRequestIp(request),
       });
 
