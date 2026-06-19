@@ -6,7 +6,8 @@ import {
 } from '@/lib/advisorIntelligence';
 import { prisma } from '@/lib/db';
 import { dbToRepairOrder, normalizeImageAttachments, repairLineToDbFields, repairOrderToDbFields } from '@/lib/roMapper';
-import { apiError, NOT_FOUND_ERROR, VALIDATION_ERROR } from '@/lib/errors';
+import { collectRepairOrderImagePathnames, findForbiddenImagePathname } from '@/lib/imageAccess';
+import { apiError, FORBIDDEN_ERROR, NOT_FOUND_ERROR, VALIDATION_ERROR } from '@/lib/errors';
 import { getRequestIp } from '@/lib/rate-limit';
 import { parseBody, updateRepairOrderSchema } from '@/lib/validation';
 import { emptyExtractedData } from '@/utils/diagnosticParser';
@@ -75,6 +76,28 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         xentryOcrTexts: data.xentryOcrTexts,
         repairLines: data.repairLines,
       };
+
+      const pathnamesToValidate: string[] = [];
+      if (data.xentryImages) {
+        pathnamesToValidate.push(
+          ...collectRepairOrderImagePathnames({ xentryImages: normalizeImageAttachments(data.xentryImages) })
+        );
+      }
+      if (data.repairLines) {
+        for (const line of data.repairLines) {
+          if (line.xentryImages) {
+            pathnamesToValidate.push(
+              ...collectRepairOrderImagePathnames({
+                xentryImages: normalizeImageAttachments(line.xentryImages),
+              })
+            );
+          }
+        }
+      }
+      const forbiddenPathname = await findForbiddenImagePathname(session, pathnamesToValidate);
+      if (forbiddenPathname) {
+        return apiError(FORBIDDEN_ERROR, 403);
+      }
 
       const storyEdits: Array<{ lineId: string; lineNumber: number }> = [];
       if (data.repairLines) {

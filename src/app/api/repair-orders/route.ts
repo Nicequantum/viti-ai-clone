@@ -12,7 +12,8 @@ import {
   repairOrderToDbFields,
   type RepairOrderInput,
 } from '@/lib/roMapper';
-import { apiError, VALIDATION_ERROR } from '@/lib/errors';
+import { collectRepairOrderImagePathnames, findForbiddenImagePathname } from '@/lib/imageAccess';
+import { apiError, FORBIDDEN_ERROR, VALIDATION_ERROR } from '@/lib/errors';
 import { getRequestIp } from '@/lib/rate-limit';
 import { createRepairOrderSchema, parseBody } from '@/lib/validation';
 import { emptyExtractedData } from '@/utils/diagnosticParser';
@@ -131,6 +132,14 @@ export async function POST(request: Request) {
             },
           ];
         }
+      }
+
+      const forbiddenPathname = await findForbiddenImagePathname(
+        session,
+        collectRepairOrderImagePathnames(input)
+      );
+      if (forbiddenPathname) {
+        return apiError(FORBIDDEN_ERROR, 403);
       }
 
       const extractionSource: AdvisorExtractionSource =
