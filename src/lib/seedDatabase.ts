@@ -50,6 +50,7 @@ export async function runDatabaseSeed(): Promise<SeedResult> {
         email: internalEmailForD7(managerD7),
         passwordHash: managerPasswordHash,
         role: 'manager',
+        isAdmin: true,
         isActive: true,
         dealershipId: dealership.id,
       },
@@ -60,6 +61,7 @@ export async function runDatabaseSeed(): Promise<SeedResult> {
       update: {
         passwordHash: managerPasswordHash,
         role: 'manager',
+        isAdmin: true,
         isActive: true,
         dealershipId: dealership.id,
         email: internalEmailForD7(managerD7),
@@ -70,6 +72,7 @@ export async function runDatabaseSeed(): Promise<SeedResult> {
         name: 'Service Manager',
         passwordHash: managerPasswordHash,
         role: 'manager',
+        isAdmin: true,
         isActive: true,
         dealershipId: dealership.id,
         consentAt: new Date(),

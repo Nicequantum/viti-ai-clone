@@ -35,6 +35,6 @@ export async function POST(request: Request) {
       const extracted = await extractROFromImages(imageDataUrls);
       return extracted;
     },
-    { rateLimitKey: 'ro.extract', rateLimit: { limit: 15, windowMs: 60_000 } }
+    { rateLimitKey: 'ro.extract', rateLimit: { limit: 15, windowMs: 60_000 }, trackUsage: true }
   );
 }

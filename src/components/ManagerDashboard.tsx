@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Activity,
+  BarChart3,
   ClipboardList,
   ScrollText,
   Settings,
@@ -11,6 +12,7 @@ import {
   Users,
   UserRound,
 } from 'lucide-react';
+import Link from 'next/link';
 import { DealershipBranding } from '@/components/DealershipBranding';
 import { ScanROSection } from '@/components/ScanROSection';
 import type { PendingImage } from '@/types';
@@ -103,6 +105,7 @@ export function ManagerDashboard({
   }, [loadSummary]);
 
   const chain = summary?.audit?.chain;
+  const isAdmin = session.isAdmin;
 
   return (
     <div className="px-4 pt-2 pb-8">
@@ -162,6 +165,14 @@ export function ManagerDashboard({
                 : ''}
             </p>
             <div className="grid grid-cols-1 gap-2">
+              {isAdmin && (
+                <Link
+                  href="/admin/usage"
+                  className="secondary-btn w-full h-10 text-xs font-semibold flex items-center justify-center gap-2"
+                >
+                  <BarChart3 size={14} /> USAGE
+                </Link>
+              )}
               <button
                 onClick={onOpenServiceAdvisors}
                 className="secondary-btn w-full h-10 text-xs font-semibold flex items-center justify-center gap-2"

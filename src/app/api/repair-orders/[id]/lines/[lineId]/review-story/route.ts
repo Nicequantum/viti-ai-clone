@@ -76,6 +76,6 @@ export async function POST(
 
       return { review: quality };
     },
-    { rateLimitKey: 'story.review', rateLimit: RATE_LIMITS.generate }
+    { rateLimitKey: 'story.review', rateLimit: RATE_LIMITS.generate, trackUsage: true }
   );
 }

@@ -135,6 +135,6 @@ export async function POST(
 
       return { warrantyStory, quality };
     },
-    { rateLimitKey: 'story.generate', rateLimit: RATE_LIMITS.generate }
+    { rateLimitKey: 'story.generate', rateLimit: RATE_LIMITS.generate, trackUsage: true }
   );
 }

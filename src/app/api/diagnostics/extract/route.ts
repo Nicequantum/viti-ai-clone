@@ -34,6 +34,6 @@ export async function POST(request: Request) {
       const extracted = await extractDiagnosticsFromImage(imageDataUrl);
       return extracted;
     },
-    { rateLimitKey: 'diagnostics.extract', rateLimit: { limit: 30, windowMs: 60_000 } }
+    { rateLimitKey: 'diagnostics.extract', rateLimit: { limit: 30, windowMs: 60_000 }, trackUsage: true }
   );
 }

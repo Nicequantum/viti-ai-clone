@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, Building2, KeyRound, LogOut, ScrollText, Shield, User, UserPlus, UserRound, Users } from 'lucide-react';
+import { ArrowLeft, BarChart3, Building2, KeyRound, LogOut, ScrollText, Shield, User, UserPlus, UserRound, Users } from 'lucide-react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { api, type TechnicianUser } from '@/lib/api';
 import type { TechnicianSession } from '@/types';
@@ -29,6 +30,7 @@ export function SettingsView({ session, onBack, onLogout, onOpenAuditLogs, onOpe
   const [resetPassword, setResetPassword] = useState('');
 
   const isManager = session.role === 'manager';
+  const isAdmin = session.isAdmin === true;
 
   const loadUsers = useCallback(async () => {
     if (!isManager) return;
@@ -188,6 +190,22 @@ export function SettingsView({ session, onBack, onLogout, onOpenAuditLogs, onOpe
           </li>
         </ul>
       </div>
+
+      {isAdmin && (
+        <Link
+          href="/admin/usage"
+          className="ios-card p-5 mb-4 w-full flex items-center justify-between text-left"
+        >
+          <div className="flex items-center gap-2">
+            <BarChart3 size={16} className="text-[#0a84ff]" />
+            <div>
+              <div className="font-semibold text-sm">Usage</div>
+              <div className="text-[10px] text-[#8e8e93]">Daily AI usage limits & technician analytics</div>
+            </div>
+          </div>
+          <span className="text-[#0a84ff] text-xs">OPEN</span>
+        </Link>
+      )}
 
       {isManager && onOpenServiceAdvisors && (
         <button

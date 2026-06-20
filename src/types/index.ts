@@ -233,9 +233,25 @@ export interface TechnicianSession {
   d7Number: string;
   name: string;
   role: string;
+  isAdmin: boolean;
   dealershipId: string;
   dealershipName: string;
   consentAt: string | null;
+}
+
+export interface TechnicianUsageSummary {
+  technicianId: string;
+  name: string;
+  d7Number: string;
+  role: string;
+  dailyCount: number;
+  weeklyCount: number;
+}
+
+export interface UsageAnalytics {
+  dailyLimit: number;
+  totalDailyUsage: number;
+  technicians: TechnicianUsageSummary[];
 }
 
 export interface AuditLogEntry {

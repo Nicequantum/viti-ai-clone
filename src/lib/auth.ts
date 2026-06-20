@@ -13,6 +13,7 @@ export interface SessionPayload {
   d7Number: string;
   name: string;
   role: string;
+  isAdmin: boolean;
   dealershipId: string;
   dealershipName: string;
   consentAt: string | null;
@@ -104,6 +105,7 @@ async function resolveSessionPayload(tokenPayload: SessionPayload): Promise<Sess
     d7Number: tech.d7Number,
     name: tech.name,
     role: tech.role,
+    isAdmin: tech.isAdmin,
     dealershipId: tech.dealershipId,
     dealershipName: tech.dealership.name,
     consentAt: tech.consentAt?.toISOString() ?? null,
@@ -174,6 +176,7 @@ export async function loginTechnician(d7Number: string, password: string): Promi
     d7Number: tech.d7Number,
     name: tech.name,
     role: tech.role,
+    isAdmin: tech.isAdmin,
     dealershipId: tech.dealershipId,
     dealershipName: tech.dealership.name,
     consentAt: tech.consentAt?.toISOString() ?? null,

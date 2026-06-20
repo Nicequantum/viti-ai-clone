@@ -14,6 +14,7 @@ import type {
   TechnicianSession,
   TemplateCategory,
   ExtractedData,
+  UsageAnalytics,
 } from '@/types';
 import { DIAGNOSTIC_EXTRACT_CLIENT_MS, RO_EXTRACT_CLIENT_MS } from '@/lib/timeouts';
 
@@ -259,6 +260,8 @@ export const api = {
   getAuditSummary: () => apiFetch<AuditDashboardSummary>('/api/audit-logs/summary'),
 
   getDashboardSummary: () => apiFetch<DashboardSummary>('/api/dashboard/summary'),
+
+  getUsageAnalytics: () => apiFetch<UsageAnalytics>('/api/admin/usage'),
 
   exportAuditLogsCsv: (params: {
     technicianId?: string;

@@ -7,6 +7,8 @@ export const FORBIDDEN_ERROR = 'You do not have permission to perform this actio
 export const NOT_FOUND_ERROR = 'The requested resource was not found.';
 export const VALIDATION_ERROR = 'Invalid request. Please check your input and try again.';
 export const RATE_LIMIT_ERROR = 'Too many requests. Please wait a moment and try again.';
+export const DAILY_USAGE_LIMIT_ERROR =
+  'Daily AI usage limit reached (50 requests per technician). Try again tomorrow.';
 export const SESSION_EXPIRED_ERROR = 'Your session has expired. Please sign in again.';
 export const CONSENT_REQUIRED_ERROR =
   'Data and privacy consent is required before using Benz Tech. Please accept the consent terms to continue.';

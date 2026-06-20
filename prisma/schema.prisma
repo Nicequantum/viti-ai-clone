@@ -14,6 +14,7 @@ model Dealership {
   technicians     Technician[]
   repairOrders    RepairOrder[]
   auditLogs       AuditLog[]
+  usageLogs       UsageLog[]
   serviceAdvisors ServiceAdvisor[]
   advisorObservations AdvisorComplaintObservation[]
 }
@@ -21,9 +22,11 @@ model Dealership {
 model Technician {
   id             String        @id @default(cuid())
   email          String        @unique
+  d7Number       String        @unique
   name           String
   passwordHash   String
   role           String        @default("technician")
+  isAdmin        Boolean       @default(false)
   isActive       Boolean       @default(true)
   sessionVersion Int           @default(0)
   dealershipId   String
@@ -34,6 +37,7 @@ model Technician {
   updatedAt      DateTime      @updatedAt
   repairOrders   RepairOrder[]
   auditLogs      AuditLog[]
+  usageLogs      UsageLog[]
 
   @@index([dealershipId])
   @@index([isActive])
@@ -218,5 +222,18 @@ model AuditLog {
   @@index([technicianId])
   @@index([action])
   @@index([createdAt])
+  @@index([dealershipId, createdAt])
+}
+
+model UsageLog {
+  id           String      @id @default(cuid())
+  technicianId String
+  technician   Technician  @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+  dealershipId String
+  dealership   Dealership  @relation(fields: [dealershipId], references: [id], onDelete: Cascade)
+  routeKey     String
+  createdAt    DateTime    @default(now())
+
+  @@index([technicianId, createdAt])
   @@index([dealershipId, createdAt])
 }
