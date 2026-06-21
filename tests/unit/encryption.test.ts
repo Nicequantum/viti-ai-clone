@@ -6,6 +6,7 @@ import {
   decryptStringArray,
   encryptOptionalSensitiveText,
   encryptPII,
+  encryptSensitiveText,
   encryptStringArray,
 } from '../../src/lib/encryption';
 
@@ -16,7 +17,7 @@ describe('sensitive field encryption', () => {
 
   test('encrypts and decrypts technician notes', () => {
     const notes = 'Quick Test found P0300. Performed coil swap test.';
-    const encrypted = encryptPII(notes);
+    const encrypted = encryptSensitiveText(notes);
     assert.notEqual(encrypted, notes);
     assert.equal(decryptSensitiveText(encrypted), notes);
   });

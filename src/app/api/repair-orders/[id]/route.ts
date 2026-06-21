@@ -72,7 +72,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         complaints: data.complaints ?? existingMapped.complaints,
         complaintLabels: data.complaintLabels ?? existingMapped.complaintLabels,
         xentryImages: data.xentryImages ? normalizeImageAttachments(data.xentryImages) : undefined,
-        xentryOcrTexts: data.xentryOcrTexts,
+        xentryOcrTexts: data.xentryOcrTexts ?? existingMapped.xentryOcrTexts,
         repairLines: data.repairLines,
       };
 

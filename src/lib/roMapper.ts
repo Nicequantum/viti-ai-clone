@@ -9,6 +9,7 @@ import {
   encryptComplaintsPayload,
   encryptOptionalSensitiveText,
   encryptPII,
+  encryptSensitiveText,
   encryptStringArray,
 } from './encryption';
 import { buildImageProxyUrl, extractPathnameFromImageRef } from './imageUrls';
@@ -194,7 +195,7 @@ export function repairLineToDbFields(line: RepairLine) {
     lineNumber: line.lineNumber,
     description: line.description,
     customerConcernEncrypted: encryptPII(line.customerConcern),
-    technicianNotesEncrypted: encryptPII(line.technicianNotes),
+    technicianNotesEncrypted: encryptSensitiveText(line.technicianNotes),
     xentryImageUrls: imageAttachmentsToJson(line.xentryImages),
     xentryOcrTextsEncrypted: encryptStringArray(line.xentryOcrTexts || []),
     extractedData: JSON.stringify(line.extractedData || {}),

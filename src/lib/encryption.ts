@@ -68,6 +68,12 @@ export function decryptStringArray(ciphertext: string): string[] {
   return [];
 }
 
+/** Encrypt a sensitive text field for storage (technician notes, etc.). */
+export function encryptSensitiveText(plaintext: string): string {
+  if (!plaintext) return '';
+  return encryptPII(plaintext);
+}
+
 /** Decrypt a sensitive text field, falling back to legacy plaintext values. */
 export function decryptSensitiveText(ciphertext: string): string {
   if (!ciphertext) return '';

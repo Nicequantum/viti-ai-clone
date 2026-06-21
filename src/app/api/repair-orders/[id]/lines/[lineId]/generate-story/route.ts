@@ -13,7 +13,7 @@ import {
   seedTemplateLibraryIfEmpty,
   selectRelevantKnowledgeEntries,
 } from '@/lib/templateLibrary';
-import { encryptPII } from '@/lib/encryption';
+import { encryptOptionalSensitiveText } from '@/lib/encryption';
 import { dbToRepairOrder } from '@/lib/roMapper';
 import { apiError, NOT_FOUND_ERROR } from '@/lib/errors';
 import { getRequestIp, RATE_LIMITS } from '@/lib/rate-limit';
@@ -104,7 +104,7 @@ export async function POST(
 
       await prisma.repairLine.update({
         where: { id: lineId },
-        data: { warrantyStoryEncrypted: encryptPII(warrantyStory) },
+        data: { warrantyStoryEncrypted: encryptOptionalSensitiveText(warrantyStory) },
       });
 
       let quality = null;
