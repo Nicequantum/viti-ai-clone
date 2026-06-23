@@ -1,6 +1,7 @@
 import type { RepairLine, RepairOrder } from '@/types';
 import { formatExtractedDataForPrompt } from '@/utils/diagnosticParser';
 import { MI_AUDIT_GUIDELINES } from './miAuditGuidelines';
+import { PROMPT_VERSION } from './version';
 import { WARRANTY_WORKFLOW_STEPS } from './warrantyStory';
 
 export type StoryQualityGrade = 'excellent' | 'strong' | 'needs-work' | 'at-risk';
@@ -76,6 +77,8 @@ const REVIEW_JSON_SCHEMA = `{
 
 export const STORY_SCORE_SYSTEM_PROMPT = `You are a Mercedes-Benz warranty audit specialist simulating Mercedes Intelligence 2.0 (MI 2.0) story review.
 
+Prompt version: ${PROMPT_VERSION}
+
 ${MI_AUDIT_GUIDELINES}
 
 ## YOUR TASK
@@ -95,6 +98,8 @@ Respond with ONLY valid JSON matching this schema (no markdown, no commentary):
 ${SCORE_JSON_SCHEMA}`;
 
 export const STORY_REVIEW_SYSTEM_PROMPT = `You are a senior Mercedes-Benz warranty coach helping technicians pass Mercedes Intelligence 2.0 audits.
+
+Prompt version: ${PROMPT_VERSION}
 
 ${MI_AUDIT_GUIDELINES}
 

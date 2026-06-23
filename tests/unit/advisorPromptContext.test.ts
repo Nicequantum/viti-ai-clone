@@ -67,13 +67,13 @@ describe('advisor prompt context', () => {
   test('injects advisor context into warranty story user message', () => {
     const advisorContext = formatAdvisorContextForPrompt(sampleContext);
     const message = buildWarrantyStoryUserMessage(baseRo, baseLine, '', undefined, advisorContext);
-    assert.match(message, /ADVISOR INTELLIGENCE/);
+    assert.match(message, /Advisor intelligence/i);
     assert.match(message, /Maria Lopez/);
-    assert.match(message, /mirror that advisor's complaint phrasing style/i);
+    assert.match(message, /opening paragraphs only/i);
   });
 
   test('omits advisor section when no context is provided', () => {
     const message = buildWarrantyStoryUserMessage(baseRo, baseLine);
-    assert.doesNotMatch(message, /ADVISOR INTELLIGENCE/);
+    assert.doesNotMatch(message, /Advisor intelligence/i);
   });
 });
