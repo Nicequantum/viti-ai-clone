@@ -24,13 +24,12 @@ A secure, enterprise-grade platform that enables Mercedes-Benz service technicia
 ## Key Features
 
 - Voice-first input with stable text editing during dictation
-- Intelligent Grok AI-powered warranty story generation
+- Grok AI-powered intelligent warranty story generation
 - AES-256-GCM encryption for all sensitive data
 - Immutable SHA-256 hash-chained audit trail
-- Client-side image compression and secure storage
+- Client-side image compression and secure blob storage
 - Professional branded PDF generation
 - Role-based access control with instant session revocation
-- Built for reliability in high-pressure dealership environments
 
 ---
 
@@ -40,52 +39,39 @@ A secure, enterprise-grade platform that enables Mercedes-Benz service technicia
 flowchart TD
     subgraph Frontend["Frontend — Next.js 15 + React 19"]
         A[Voice + Stable Text Editing]
-        B[OCR + Image Compression]
-        A --> B
-    end
-
-    subgraph Security["Security Layer"]
-        C[JWT Auth + Session Revocation]
-        D[Server-side AES-256-GCM Encryption]
-        C --> D
     end
 
     subgraph Backend["Backend — Next.js API Routes"]
-        E[Grok AI Story Generation]
-        D --> E
+        B[JWT Auth + Session Revocation]
+        C[Server-side AES-256 Encryption]
+        D[Grok AI Story Generation]
     end
 
     subgraph Audit["Audit Trail"]
-        F[SHA-256 Hash-Chained Logging]
-        E --> F
+        E[SHA-256 Hash-Chained Logging]
     end
 
     subgraph Output["Output"]
-        G[Branded PDF Export]
-        E --> G
+        F[Branded PDF Export]
     end
 
+    A --> B
     B --> C
-
-    classDef frontend fill:#dbeafe,stroke:#1e40af
-    classDef security fill:#dcfce7,stroke:#166534
-    classDef audit fill:#fef3c7,stroke:#92400e
-    class A,B frontend
-    class C,D security
-    class F audit
+    C --> D
+    D --> E
+    D --> F
 ```
 
 ---
 
 ## Common Failure Modes & Troubleshooting
 
-| Issue | Error Message / Symptom | Recommended Fix |
-|-------|-------------------------|-----------------|
-| **Grok API Timeout** | Request timed out or long loading spinner | Shorten your input and click **Regenerate** |
+| Issue | Symptom / Error | Recommended Fix |
+|-------|-----------------|-----------------|
+| **Grok API Timeout** | Long loading spinner or timeout message | Shorten input and click **Regenerate** |
 | **Voice Input Not Working** | Microphone does not respond | Allow microphone permission in Chrome or Edge |
-| **PDF Generation Failed** | Failed to generate PDF | Ensure all required fields are filled, then regenerate story |
-| **Session Expiring Frequently** | Logged out unexpectedly | Check device clock or clear browser cache |
-| **Audit Chain Warning** | Hash chain integrity error | Stop use and notify IT immediately |
+| **PDF Generation Failed** | "Failed to generate PDF" | Fill all required fields first, then regenerate |
+| **Frequent Logouts** | Getting logged out often | Check device clock or clear browser cache |
 
 ---
 
@@ -101,6 +87,6 @@ npm run dev
 
 ---
 
-**Important:** A signed Data Processing Agreement with xAI is required before processing real customer or vehicle data.
+**Note:** The application UI still uses "Benz Tech" branding in several places. Let me know if you want me to help you rebrand the actual app to "Merlin" next.
 
-Built specifically for Mercedes-Benz Fixed Operations teams that demand both speed and full accountability.
+Built for Mercedes-Benz Fixed Operations teams.
