@@ -13,7 +13,7 @@
 | **Prepared by** | [SERVICE MANAGER / FIXED OPS NAME] |
 | **Date** | [DOCUMENT DATE] |
 
-**Related rollout documents:** [Go-Live Checklist](./Go-Live-Checklist.md) · [Rollout Checklist](./Rollout-Checklist.md) · [Go-Live Email Template](./Go-Live-Email-Template.md)
+**Related rollout documents:** [Master Rollout Document](./Master-Rollout-Document.md) · [Go-Live Checklist](./Go-Live-Checklist.md) · [Rollout Checklist](./Rollout-Checklist.md) · [Go-Live Email Template](./Go-Live-Email-Template.md)
 
 ---
 

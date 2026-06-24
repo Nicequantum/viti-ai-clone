@@ -164,10 +164,13 @@ StableTextarea / StableInput
 
 ## Dealership Rollout
 
-Professional onboarding package for Fixed Ops rollout across multiple Mercedes-Benz dealerships. Send these documents directly to service managers, trainers, and IT before go-live.
+> **Start here — dealership leadership:** [**Master Rollout Document**](./docs/Master-Rollout-Document.md) — the single authoritative overview for Fixed Ops Directors, Service Managers, and General Managers. Readable in under 10 minutes; covers business case, timeline, go-live gates, and success metrics.
+
+Professional onboarding package for Fixed Ops rollout across multiple Mercedes-Benz dealerships. Send the master document to executives first; use the supporting library below for execution.
 
 | Document | Audience | Purpose |
 |----------|----------|---------|
+| [**Master Rollout Document**](./docs/Master-Rollout-Document.md) | **GM, Fixed Ops, Service Manager** | **Primary leadership overview — start here** |
 | [**Technician Quick Start**](./docs/Technician-Quick-Start.md) | Technicians | One-page guide — voice input, story generation, bay-floor tips |
 | [**Admin Setup Guide**](./docs/Admin-Setup-Guide.md) | Service Managers & IT | Environment setup, validation, health monitoring, encryption |
 | [**Rollout Checklist**](./docs/Rollout-Checklist.md) | All rollout roles | Pre-rollout, deployment day, and post-rollout sign-off |
@@ -175,10 +178,11 @@ Professional onboarding package for Fixed Ops rollout across multiple Mercedes-B
 
 **Recommended rollout sequence:**
 
-1. IT completes [Admin Setup Guide](./docs/Admin-Setup-Guide.md) and passes `npm run validate:pre-rollout`
-2. Service manager works through [Rollout Checklist](./docs/Rollout-Checklist.md) Phase 1
-3. Trainer delivers session per [Training Outline](./docs/Training-Outline.md) on deployment day
-4. Technicians keep [Technician Quick Start](./docs/Technician-Quick-Start.md) at each bay tablet
+1. Leadership reviews [Master Rollout Document](./docs/Master-Rollout-Document.md) and approves go-live date
+2. IT completes [Admin Setup Guide](./docs/Admin-Setup-Guide.md) and passes `npm run validate:pre-rollout`
+3. Service manager works through [Rollout Checklist](./docs/Rollout-Checklist.md) Phase 1
+4. Trainer delivers session per [Training Outline](./docs/Training-Outline.md) on deployment day
+5. Technicians keep [Bay Reference Card](./docs/Bay-Reference-Card.md) and [Technician Quick Start](./docs/Technician-Quick-Start.md) at each bay tablet
 
 Screenshot placeholders in the docs use `./docs/images/` — replace with dealership-specific captures before printing.
 
@@ -190,7 +194,8 @@ Final deliverable package for launching Merlin to production at Mercedes-Benz de
 
 | Step | Document | Audience | When to use |
 |------|----------|----------|-------------|
-| 1 | [**Go-Live Summary**](./docs/Go-Live-Summary.md) | GM, Fixed Ops Director | Secure leadership approval and set expectations |
+| 0 | [**Master Rollout Document**](./docs/Master-Rollout-Document.md) | GM, Fixed Ops, Service Manager | **Authoritative overview — read first** |
+| 1 | [**Go-Live Summary**](./docs/Go-Live-Summary.md) | GM, Fixed Ops Director | One-page approval brief (companion to Master doc) |
 | 2 | [**Admin Setup Guide**](./docs/Admin-Setup-Guide.md) | IT, Service Manager | Provision environment, database, and validation |
 | 3 | [**Rollout Checklist**](./docs/Rollout-Checklist.md) | IT, SM, FO, Trainer | Phase 1 preparation (1–2 weeks before go-live) |
 | 4 | [**Go-Live Checklist**](./docs/Go-Live-Checklist.md) | IT, SM, FO | Final go/no-go review **24–48 hours before launch** |

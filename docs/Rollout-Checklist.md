@@ -199,6 +199,7 @@ Use this checklist for **each dealership location**. Copy the checkboxes into yo
 
 | Document | Link |
 |----------|------|
+| **Master Rollout Document** | [Master-Rollout-Document.md](./Master-Rollout-Document.md) |
 | Go-Live Summary | [Go-Live-Summary.md](./Go-Live-Summary.md) |
 | Go-Live Checklist (final go/no-go) | [Go-Live-Checklist.md](./Go-Live-Checklist.md) |
 | Go-Live Email Template | [Go-Live-Email-Template.md](./Go-Live-Email-Template.md) |
