@@ -2,6 +2,7 @@ import { appendAuditLogInTransaction } from '@/lib/audit';
 import { encryptOptionalSensitiveText, decryptSensitiveText, decryptOptionalSensitiveText } from '@/lib/encryption';
 import { prisma } from '@/lib/db';
 import { GLOBAL_DEALERSHIP_ID } from '@/lib/templateLibrary';
+import { sanitizeForCDKWithMeta } from '@/lib/sanitizeForCDK';
 
 export interface ApplyCustomerPayTemplateInput {
   repairOrderId: string;
@@ -18,6 +19,8 @@ export interface ApplyCustomerPayTemplateResult {
   isCustomerPay: true;
   /** M3: true when apply was skipped because line already had this template story. */
   idempotent?: boolean;
+  /** True when unsafe characters were stripped for CDK compatibility. */
+  cdkSanitized?: boolean;
 }
 
 export interface ClearCustomerPayModeInput {
@@ -107,7 +110,8 @@ export async function applyCustomerPayTemplate(
     throw new Error('Repair line not found');
   }
 
-  const preWrittenStory = decryptSensitiveText(template.contentEncrypted);
+  const templateStory = decryptSensitiveText(template.contentEncrypted);
+  const { text: preWrittenStory, wasModified: cdkSanitized } = sanitizeForCDKWithMeta(templateStory);
 
   if (
     await isDuplicateTemplateApply(
@@ -123,6 +127,7 @@ export async function applyCustomerPayTemplate(
       templateTitle: template.title,
       isCustomerPay: true,
       idempotent: true,
+      cdkSanitized,
     };
   }
 
@@ -165,5 +170,6 @@ export async function applyCustomerPayTemplate(
     warrantyStory: preWrittenStory,
     templateTitle: template.title,
     isCustomerPay: true,
+    cdkSanitized,
   };
 }

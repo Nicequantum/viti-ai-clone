@@ -20,6 +20,7 @@ import { dbToRepairOrder } from '@/lib/roMapper';
 import { apiError, NOT_FOUND_ERROR } from '@/lib/errors';
 import { mapGrokRouteError } from '@/lib/grokErrors';
 import { getRequestIp, RATE_LIMITS } from '@/lib/rate-limit';
+import { sanitizeForCDKWithMeta } from '@/lib/sanitizeForCDK';
 
 export async function POST(
   request: Request,
@@ -97,14 +98,18 @@ export async function POST(
       const knowledgeBaseContext = formatKnowledgeBaseForPrompt(relevantKb);
 
       let warrantyStory: string;
+      let cdkSanitized = false;
       try {
-        warrantyStory = await generateWarrantyStory(
+        const rawStory = await generateWarrantyStory(
           mapped,
           line,
           historyContext,
           advisorContext,
           knowledgeBaseContext
         );
+        const cleaned = sanitizeForCDKWithMeta(rawStory);
+        warrantyStory = cleaned.text;
+        cdkSanitized = cleaned.wasModified;
       } catch (error) {
         const mapped = mapGrokRouteError(error, 'Story generation');
         return apiError(mapped.message, mapped.status);
@@ -147,7 +152,7 @@ export async function POST(
         data: { warrantyStoryEncrypted: encryptOptionalSensitiveText(warrantyStory) },
       });
 
-      return { warrantyStory, quality };
+      return { warrantyStory, quality, cdkSanitized };
     },
     {
       rateLimitKey: 'story.generate',

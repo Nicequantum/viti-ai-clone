@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { DEALERSHIP_DISPLAY_NAME } from '@/lib/constants';
+import { sanitizeForCDK, sanitizeForCDKWithMeta } from '@/lib/sanitizeForCDK';
 import type { RepairLine, RepairOrder } from '@/types';
 
 const STORY_LINE_HEIGHT = 1.25;
@@ -23,8 +24,9 @@ export function normalizeWarrantyStoryText(text: string): string {
     .trim();
 }
 
-export async function copyPlainTextToClipboard(text: string): Promise<void> {
-  const plain = normalizeWarrantyStoryText(text);
+export async function copyPlainTextToClipboard(text: string): Promise<{ wasModified: boolean }> {
+  const normalized = normalizeWarrantyStoryText(text);
+  const { text: plain, wasModified } = sanitizeForCDKWithMeta(normalized);
   if (!plain) {
     throw new Error('Nothing to copy');
   }
@@ -33,7 +35,7 @@ export async function copyPlainTextToClipboard(text: string): Promise<void> {
     try {
       const blob = new Blob([plain], { type: 'text/plain;charset=utf-8' });
       await navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })]);
-      return;
+      return { wasModified };
     } catch {
       // fall through to writeText / execCommand
     }
@@ -42,7 +44,7 @@ export async function copyPlainTextToClipboard(text: string): Promise<void> {
   if (navigator.clipboard?.writeText) {
     try {
       await navigator.clipboard.writeText(plain);
-      return;
+      return { wasModified };
     } catch {
       // fall through
     }
@@ -66,6 +68,7 @@ export async function copyPlainTextToClipboard(text: string): Promise<void> {
   if (!copied) {
     throw new Error('Copy command failed');
   }
+  return { wasModified };
 }
 
 function setTextColor(doc: jsPDF, color: { r: number; g: number; b: number }): void {
@@ -281,7 +284,7 @@ export function exportWarrantyStoryPdf(
   promptVersion?: string,
   technicianName?: string
 ): void {
-  const story = normalizeWarrantyStoryText(storyOverride ?? line.warrantyStory ?? '');
+  const story = sanitizeForCDK(normalizeWarrantyStoryText(storyOverride ?? line.warrantyStory ?? ''));
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   const margin = 45;
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -326,12 +329,12 @@ export async function copyFormattedStory(
   _ro: RepairOrder,
   line: RepairLine,
   storyOverride?: string
-): Promise<void> {
+): Promise<{ wasModified: boolean }> {
   const storyEl = typeof document !== 'undefined' ? document.getElementById(`warranty-story-${line.id}`) : null;
   const raw =
     storyOverride ??
     (storyEl instanceof HTMLTextAreaElement ? storyEl.value : undefined) ??
     line.warrantyStory ??
     '';
-  await copyPlainTextToClipboard(raw);
+  return copyPlainTextToClipboard(raw);
 }

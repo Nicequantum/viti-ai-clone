@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { api, ApiError } from '@/lib/api';
 import { clientLog } from '@/lib/clientLog';
+import { sanitizeForCDKWithMeta } from '@/lib/sanitizeForCDK';
 import { runDiagnosticOCR, runMultiPassOCR } from '@/services/ocr';
 import type {
   AppView,
@@ -78,6 +79,7 @@ export function useRepairOrders({
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingLineId, setGeneratingLineId] = useState<string | null>(null);
   const [lastGeneratedStoryByLine, setLastGeneratedStoryByLine] = useState<Record<string, string>>({});
+  const [cdkSanitizedByLine, setCdkSanitizedByLine] = useState<Record<string, boolean>>({});
   const [storyQualityByLine, setStoryQualityByLine] = useState<Record<string, StoryQualityResult>>({});
   const [storyReviewByLine, setStoryReviewByLine] = useState<Record<string, StoryReviewResult>>({});
   const [isReviewing, setIsReviewing] = useState(false);
@@ -581,9 +583,19 @@ export function useRepairOrders({
 
   const updateLine = useCallback(
     (lineId: string, updates: Partial<RepairLine>) => {
+      let nextUpdates = updates;
+      if (updates.warrantyStory !== undefined) {
+        const { text, wasModified } = sanitizeForCDKWithMeta(updates.warrantyStory);
+        nextUpdates = { ...updates, warrantyStory: text };
+        if (wasModified) {
+          setCdkSanitizedByLine((prev) => ({ ...prev, [lineId]: true }));
+        }
+      }
       applyROUpdate((ro) => ({
         ...ro,
-        repairLines: ro.repairLines.map((line) => (line.id === lineId ? { ...line, ...updates } : line)),
+        repairLines: ro.repairLines.map((line) =>
+          line.id === lineId ? { ...line, ...nextUpdates } : line
+        ),
       }));
     },
     [applyROUpdate]
@@ -1040,6 +1052,7 @@ export function useRepairOrders({
         setLastGeneratedStoryByLine,
         setStoryQualityByLine,
         setStoryReviewByLine,
+        setCdkSanitizedByLine,
       },
       { flushPendingSave, applyROUpdate, clearLineQualityState, invalidateReviewRequests }
     );
@@ -1048,11 +1061,21 @@ export function useRepairOrders({
     setLastGeneratedStoryByLine((prev) => ({ ...prev, [lineId]: text }));
   }, []);
 
+  const clearCdkSanitizedNotice = useCallback((lineId: string) => {
+    setCdkSanitizedByLine((prev) => {
+      if (!prev[lineId]) return prev;
+      const next = { ...prev };
+      delete next[lineId];
+      return next;
+    });
+  }, []);
+
   const currentLine = currentRO?.repairLines.find((l) => l.id === currentLineId);
   const lastGeneratedStoryForLine =
     currentLineId && lastGeneratedStoryByLine[currentLineId]
       ? lastGeneratedStoryByLine[currentLineId]
       : null;
+  const cdkSanitizedForLine = Boolean(currentLineId && cdkSanitizedByLine[currentLineId]);
 
   const isGeneratingForLine = isGenerating && generatingLineId === currentLineId;
   const isReviewingForLine = isReviewing && reviewingLineId === currentLineId;
@@ -1125,6 +1148,8 @@ export function useRepairOrders({
     storyReviewForLine,
     storyQualityStaleForLine,
     lastGeneratedStoryForLine,
+    cdkSanitizedForLine,
+    clearCdkSanitizedNotice,
     openingROId,
     filteredROs,
     flushPendingSave,

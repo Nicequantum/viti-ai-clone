@@ -34,6 +34,8 @@ interface LineViewProps {
   storyReview: StoryReviewResult | null;
   storyQualityStale: boolean;
   lastGeneratedStoryText: string | null;
+  cdkSanitizedNotice?: boolean;
+  onClearCdkSanitizedNotice?: () => void;
   onBack: () => void;
   onUpdateLine: (updates: Partial<RepairLine>) => void;
   onAddXentryPhotos: () => void;
@@ -68,6 +70,8 @@ export function LineView({
   storyReview,
   storyQualityStale,
   lastGeneratedStoryText,
+  cdkSanitizedNotice = false,
+  onClearCdkSanitizedNotice,
   onBack,
   onUpdateLine,
   onAddXentryPhotos,
@@ -117,7 +121,10 @@ export function LineView({
     const storyText = storyEl?.value ?? line.warrantyStory ?? '';
     if (!storyText.trim()) return;
     try {
-      await copyFormattedStory(ro, line, storyText);
+      const { wasModified } = await copyFormattedStory(ro, line, storyText);
+      if (wasModified) {
+        toast.message('Story cleaned for CDK compatibility');
+      }
       toast.success('Story copied — ready to paste into CDK');
     } catch {
       toast.error('Clipboard copy failed');
@@ -404,12 +411,20 @@ export function LineView({
                 Exceeds recommended DMS character limit — edit before submission.
               </div>
             )}
+            {cdkSanitizedNotice && (
+              <div className="text-xs text-benz-amber mb-3 bg-benz-amber/10 border border-benz-amber/25 rounded-lg px-3 py-2">
+                Story cleaned for CDK compatibility
+              </div>
+            )}
             <div className="benz-complaint-field">
               <StableTextarea
                 id={`warranty-story-${line.id}`}
                 fieldKey={`${line.id}-story`}
                 value={line.warrantyStory}
-                onChange={(v) => onUpdateLine({ warrantyStory: v })}
+                onChange={(v) => {
+                  onClearCdkSanitizedNotice?.();
+                  onUpdateLine({ warrantyStory: v });
+                }}
                 className="benz-textarea text-[15px] leading-relaxed mb-4 min-h-[220px]"
                 placeholder="Edit warranty story before DMS submission..."
               />

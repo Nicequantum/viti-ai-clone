@@ -22,6 +22,7 @@ interface StoryWorkflowSetters {
   setLastGeneratedStoryByLine: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   setStoryQualityByLine: React.Dispatch<React.SetStateAction<Record<string, StoryQualityResult>>>;
   setStoryReviewByLine: React.Dispatch<React.SetStateAction<Record<string, StoryReviewResult>>>;
+  setCdkSanitizedByLine: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }
 
 /** M21: story generation, review, and Customer Pay template workflow. */
@@ -64,6 +65,9 @@ export function useROStoryWorkflow(
           }),
           { immediate: true }
         );
+        if (result.cdkSanitized) {
+          setters.setCdkSanitizedByLine((prev) => ({ ...prev, [lineId]: true }));
+        }
         if (!result.idempotent) {
           toast.success(`"${result.templateTitle}" applied — Customer Pay instant story`);
         }
@@ -134,9 +138,18 @@ export function useROStoryWorkflow(
 
         deps.clearLineQualityState(lineId);
         deps.invalidateReviewRequests();
-        const { warrantyStory, quality } = await api.generateStory(latestRO.id, lineId);
+        const { warrantyStory, quality, cdkSanitized } = await api.generateStory(latestRO.id, lineId);
         if (seq !== refs.generateStorySeqRef.current) return;
         setters.setLastGeneratedStoryByLine((prev) => ({ ...prev, [lineId]: warrantyStory }));
+        if (cdkSanitized) {
+          setters.setCdkSanitizedByLine((prev) => ({ ...prev, [lineId]: true }));
+        } else {
+          setters.setCdkSanitizedByLine((prev) => {
+            const next = { ...prev };
+            delete next[lineId];
+            return next;
+          });
+        }
         deps.applyROUpdate(
           (ro) => ({
             ...ro,
@@ -152,6 +165,9 @@ export function useROStoryWorkflow(
               [lineId]: { ...quality, scoredAgainstStory: baseline },
             }));
           }
+        }
+        if (cdkSanitized) {
+          toast.message('Story cleaned for CDK compatibility');
         }
         toast.success(
           quality

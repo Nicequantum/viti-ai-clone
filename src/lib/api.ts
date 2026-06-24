@@ -187,7 +187,7 @@ export const api = {
     }),
 
   generateStory: (roId: string, lineId: string) =>
-    apiFetch<{ warrantyStory: string; quality: StoryQualityResult | null }>(
+    apiFetch<{ warrantyStory: string; quality: StoryQualityResult | null; cdkSanitized?: boolean }>(
       `/api/repair-orders/${roId}/lines/${lineId}/generate-story`,
       { method: 'POST', timeoutMs: 180_000 }
     ),
@@ -200,7 +200,7 @@ export const api = {
 
   /** Customer Pay — instant pre-written story; bypasses Grok and quality audit. */
   applyCustomerPayTemplate: (roId: string, lineId: string, templateId: string) =>
-    apiFetch<{ warrantyStory: string; templateTitle: string; isCustomerPay: true; idempotent?: boolean }>(
+    apiFetch<{ warrantyStory: string; templateTitle: string; isCustomerPay: true; idempotent?: boolean; cdkSanitized?: boolean }>(
       `/api/repair-orders/${roId}/lines/${lineId}/apply-customer-pay-template`,
       { method: 'POST', body: JSON.stringify({ templateId }), timeoutMs: 15_000 }
     ),

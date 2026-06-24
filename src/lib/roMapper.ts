@@ -15,6 +15,7 @@ import {
   encryptStringArray,
 } from './encryption';
 import { emptyExtractedData } from '@/utils/diagnosticParser';
+import { sanitizeForCDK } from './sanitizeForCDK';
 import { buildImageProxyUrl, extractPathnameFromImageRef } from './imageUrls';
 
 function parseJson<T>(raw: string, fallback: T): T {
@@ -213,7 +214,9 @@ export function repairLineToDbFields(line: RepairLine) {
     xentryImageUrls: imageAttachmentsToJson(line.xentryImages),
     xentryOcrTextsEncrypted: encryptStringArray(line.xentryOcrTexts || []),
     extractedDataEncrypted: encryptJsonObject(line.extractedData || emptyExtractedData()),
-    warrantyStoryEncrypted: encryptOptionalSensitiveText(line.warrantyStory),
+    warrantyStoryEncrypted: encryptOptionalSensitiveText(
+      line.warrantyStory ? sanitizeForCDK(line.warrantyStory) : line.warrantyStory
+    ),
     isCustomerPay: line.isCustomerPay ?? false,
   };
 }

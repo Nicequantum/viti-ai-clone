@@ -193,6 +193,8 @@ export function BenzTechApp() {
           storyReview={ro.storyReviewForLine}
           storyQualityStale={ro.storyQualityStaleForLine}
           lastGeneratedStoryText={ro.lastGeneratedStoryForLine}
+          cdkSanitizedNotice={ro.cdkSanitizedForLine}
+          onClearCdkSanitizedNotice={() => ro.clearCdkSanitizedNotice(ro.currentLine!.id)}
           onBack={() => ro.setView('ro')}
           onUpdateLine={(updates) => ro.updateLine(ro.currentLine!.id, updates)}
           onAddXentryPhotos={() => ro.addXentryPhotos(ro.currentLine!.id)}
