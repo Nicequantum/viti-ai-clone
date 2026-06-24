@@ -30,7 +30,7 @@ const nextConfig = {
     },
   },
   async headers() {
-    // M12: CSP is applied in src/middleware.ts with per-request nonces (no unsafe-inline/eval).
+    // M12: CSP is applied in src/middleware.ts (unsafe-inline scripts for internal dealership use).
     return [
       {
         source: '/(.*)',

@@ -12,7 +12,6 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'Merlin — Mercedes-Benz Warranty Platform',
   description: 'Mercedes-Benz dealership warranty story platform with audit-safe AI documentation.',
-  manifest: '/manifest.json',
   icons: {
     icon: [
       { url: '/favicon.ico' },

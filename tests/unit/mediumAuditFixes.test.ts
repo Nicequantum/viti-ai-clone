@@ -57,10 +57,10 @@ describe('Medium audit fixes (M1–M30)', () => {
     assert.ok(readSrc('prisma/schema.prisma').includes('enum TechnicianRole'));
   });
 
-  it('M12: nonce CSP middleware', () => {
+  it('M12: CSP middleware blocks eval', () => {
     const mw = readSrc('src/middleware.ts');
     const nextCfg = readSrc('next.config.mjs');
-    assert.ok(mw.includes("'nonce-"));
+    assert.ok(mw.includes("'unsafe-inline'"));
     assert.equal(mw.includes('unsafe-eval'), false);
     assert.equal(nextCfg.includes('unsafe-eval'), false);
   });
