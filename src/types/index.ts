@@ -346,4 +346,6 @@ export const AUDIT_ACTIONS = [
   'advisor.capture',
   'template.save',
   'customerPayTemplateApplied',
+  'customerPayStory.edit',
+  'customerPayStory.pdf_export',
 ] as const;

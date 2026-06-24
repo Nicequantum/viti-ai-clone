@@ -37,7 +37,11 @@ describe('RO → story generation integration', () => {
     }) as typeof fetch;
 
     const techEmail = process.env.TECH_SEED_EMAIL?.trim() || 'tech@dealership.com';
-    const techPassword = process.env.TECH_SEED_PASSWORD?.trim() || 'changeme123';
+    const techPassword = process.env.TECH_SEED_PASSWORD?.trim();
+    assert.ok(
+      techPassword,
+      'TECH_SEED_PASSWORD must be set for integration tests (see .env.example)'
+    );
     const session = await loginTechnician(techEmail, techPassword);
     assert.ok(session, 'Seed technician must exist — run npm run db:seed first');
     technicianId = session.technicianId;

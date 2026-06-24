@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { apiError, NOT_FOUND_ERROR } from '@/lib/errors';
 import { reviewWarrantyStory } from '@/lib/grok';
 import { PROMPT_VERSION } from '@/prompts/version';
+import { isCustomerPayRepairLine } from '@/lib/customerPayLine';
 import { dbToRepairOrder } from '@/lib/roMapper';
 import { getRequestIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { mapGrokRouteError } from '@/lib/grokErrors';
@@ -43,7 +44,7 @@ export async function POST(
       if (!line) return apiError(NOT_FOUND_ERROR, 404);
 
       const dbLine = ro.repairLines.find((l) => l.id === lineId);
-      if (dbLine?.isCustomerPay) {
+      if (isCustomerPayRepairLine(dbLine)) {
         return apiError(
           'Customer Pay stories do not require AI quality review. Edit the text directly if needed.',
           400

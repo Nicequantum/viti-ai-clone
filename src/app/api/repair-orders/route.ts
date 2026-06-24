@@ -20,10 +20,21 @@ import { createRepairOrderSchema, parseRequestBody } from '@/lib/validation';
 import { emptyExtractedData } from '@/utils/diagnosticParser';
 import { createRepairOrderFromScan } from '@/utils/repairOrderFactory';
 
+const DEFAULT_RO_PAGE_SIZE = 50;
+const MAX_RO_PAGE_SIZE = 100;
+
 export async function GET(request: Request) {
   return withAuth(
     request,
     async (session) => {
+      const url = new URL(request.url);
+      const limitRaw = Number(url.searchParams.get('limit') ?? DEFAULT_RO_PAGE_SIZE);
+      const limit = Math.min(
+        MAX_RO_PAGE_SIZE,
+        Math.max(1, Number.isFinite(limitRaw) ? Math.floor(limitRaw) : DEFAULT_RO_PAGE_SIZE)
+      );
+      const cursor = url.searchParams.get('cursor')?.trim() || undefined;
+
       const where =
         session.role === 'manager'
           ? { dealershipId: session.dealershipId }
@@ -36,16 +47,30 @@ export async function GET(request: Request) {
           technician: { select: { name: true } },
           serviceAdvisor: { select: { id: true, displayName: true } },
         },
-        orderBy: { updatedAt: 'desc' },
+        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+        take: limit + 1,
+        ...(cursor
+          ? {
+              cursor: { id: cursor },
+              skip: 1,
+            }
+          : {}),
       });
 
-      const repairOrders = orders.map((ro) => {
+      const hasMore = orders.length > limit;
+      const page = hasMore ? orders.slice(0, limit) : orders;
+
+      const repairOrders = page.map((ro) => {
         const mapped = dbToRepairOrder(ro);
         mapped.technicianName = ro.technician.name;
         return mapped;
       });
 
-      return { repairOrders };
+      return {
+        repairOrders,
+        nextCursor: hasMore ? page[page.length - 1]?.id ?? null : null,
+        hasMore,
+      };
     },
     { rateLimitKey: 'ros.list' }
   );

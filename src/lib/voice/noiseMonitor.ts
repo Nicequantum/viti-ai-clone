@@ -10,8 +10,11 @@ export class NoiseMonitor {
   private analyser: AnalyserNode | null = null;
   private stream: MediaStream | null = null;
   private rafId: number | null = null;
+  private throttleTimer: ReturnType<typeof setTimeout> | null = null;
   private data: Uint8Array | null = null;
   private level = 0;
+  /** H12: cap UI updates at 4 Hz — rAF alone caused ~60 React re-renders/sec. */
+  private static readonly EMIT_INTERVAL_MS = 250;
 
   constructor(private readonly onLevel: (level: number) => void) {}
 
@@ -44,9 +47,8 @@ export class NoiseMonitor {
     const sampleBuffer = new Uint8Array(analyser.fftSize);
     this.data = sampleBuffer;
 
-    const tick = () => {
-      if (!this.analyser || !this.data) return;
-      // Cast required: DOM lib expects Uint8Array<ArrayBuffer> while TS 5.x widens to ArrayBufferLike.
+    const sampleLevel = () => {
+      if (!this.analyser || !this.data) return 0;
       this.analyser.getByteTimeDomainData(this.data as Uint8Array<ArrayBuffer>);
       let sum = 0;
       for (let i = 0; i < this.data.length; i++) {
@@ -54,17 +56,31 @@ export class NoiseMonitor {
         sum += sample * sample;
       }
       const rms = Math.sqrt(sum / this.data.length);
-      // Map typical bay RMS (~0.01 quiet – ~0.25 loud) into 0–100 for UI.
-      const normalized = Math.min(100, Math.round(rms * 420));
-      this.level = normalized;
-      this.onLevel(normalized);
+      return Math.min(100, Math.round(rms * 420));
+    };
+
+    const tick = () => {
+      if (!this.analyser || !this.data) return;
+      this.level = sampleLevel();
       this.rafId = requestAnimationFrame(tick);
     };
 
+    const emit = () => {
+      this.onLevel(this.level);
+      this.throttleTimer = setTimeout(emit, NoiseMonitor.EMIT_INTERVAL_MS);
+    };
+
     this.rafId = requestAnimationFrame(tick);
+    this.level = sampleLevel();
+    this.onLevel(this.level);
+    this.throttleTimer = setTimeout(emit, NoiseMonitor.EMIT_INTERVAL_MS);
   }
 
   async stop(): Promise<void> {
+    if (this.throttleTimer != null) {
+      clearTimeout(this.throttleTimer);
+      this.throttleTimer = null;
+    }
     if (this.rafId != null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;

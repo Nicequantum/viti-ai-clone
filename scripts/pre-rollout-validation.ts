@@ -601,6 +601,116 @@ async function checkCriticalAuditFixes(): Promise<void> {
   }
 }
 
+async function checkHighPriorityAuditFixes(): Promise<void> {
+  section('High Priority Audit Fixes (H1–H15)');
+
+  const customerPayLineSrc = readFileSync(resolve(process.cwd(), 'src/lib/customerPayLine.ts'), 'utf8');
+  if (customerPayLineSrc.includes('isCustomerPayRepairLine')) {
+    record('High Priority', 'H1 shared Customer Pay helper', 'pass', 'client/server use isCustomerPayRepairLine');
+  } else {
+    record('High Priority', 'H1 shared Customer Pay helper', 'fail', 'Missing customerPayLine helper');
+  }
+
+  const queueSrc = readFileSync(resolve(process.cwd(), 'src/lib/repairOrderSaveQueue.ts'), 'utf8');
+  if (queueSrc.includes('enqueueRepairOrderSave') && readFileSync(resolve(process.cwd(), 'src/hooks/useRepairOrders.ts'), 'utf8').includes('await flushPendingSave()')) {
+    record('High Priority', 'H2 save queue serialization', 'pass', 'Awaitable flush + serialized RO saves');
+  } else {
+    record('High Priority', 'H2 save queue serialization', 'fail', 'Save race around Customer Pay apply not fixed');
+  }
+
+  const auditSrc = readFileSync(resolve(process.cwd(), 'src/lib/audit.ts'), 'utf8');
+  const putSrc = readFileSync(resolve(process.cwd(), 'src/app/api/repair-orders/[id]/route.ts'), 'utf8');
+  if (auditSrc.includes('customerPayStory.edit') && putSrc.includes("action: 'customerPayStory.edit'")) {
+    record('High Priority', 'H3 CP story edit audit', 'pass', 'customerPayStory.edit replaces Merlin story.edit for CP lines');
+  } else {
+    record('High Priority', 'H3 CP story edit audit', 'fail', 'Customer Pay edits still use story.edit');
+  }
+
+  const latestSrc = readFileSync(resolve(process.cwd(), 'src/app/api/audit-logs/latest/route.ts'), 'utf8');
+  const pdfSrc = readFileSync(resolve(process.cwd(), 'src/app/api/audit-logs/pdf-export/route.ts'), 'utf8');
+  if (latestSrc.includes('customerPayTemplateApplied') && pdfSrc.includes('customerPayStory.pdf_export')) {
+    record('High Priority', 'H4 CP PDF/latest audit', 'pass', 'Latest hash + PDF export respect Customer Pay actions');
+  } else {
+    record('High Priority', 'H4 CP PDF/latest audit', 'fail', 'Customer Pay PDF/latest audit incomplete');
+  }
+
+  if (auditSrc.includes('pg_advisory_xact_lock')) {
+    record('High Priority', 'H5 audit chain locking', 'pass', 'Per-dealership advisory lock on audit append');
+  } else {
+    record('High Priority', 'H5 audit chain locking', 'fail', 'Missing audit chain concurrency guard');
+  }
+
+  const encSrc = readFileSync(resolve(process.cwd(), 'src/lib/encryption.ts'), 'utf8');
+  if (encSrc.includes('encryption.decrypt_failed') && encSrc.includes('getScryptSalt')) {
+    record('High Priority', 'H6/H7 encryption hardening', 'pass', 'Loud decrypt failures + derived scrypt salt');
+  } else {
+    record('High Priority', 'H6/H7 encryption hardening', 'fail', 'Encryption fixes incomplete');
+  }
+
+  const envSrc = readFileSync(resolve(process.cwd(), 'src/lib/env.ts'), 'utf8');
+  const rateSrc = readFileSync(resolve(process.cwd(), 'src/lib/rate-limit.ts'), 'utf8');
+  if (envSrc.includes('PRODUCTION_REQUIRED_ENV_VARS') && rateSrc.includes('effectiveRateLimitConfig')) {
+    record('High Priority', 'H8 KV rate limiting', 'pass', 'KV required in production + stricter memory fallback');
+  } else {
+    record('High Priority', 'H8 KV rate limiting', 'fail', 'Rate limit production hardening incomplete');
+  }
+
+  const imageSrc = readFileSync(resolve(process.cwd(), 'src/lib/imageAccess.ts'), 'utf8');
+  if (imageSrc.includes('repairOrderContainsPathname') && imageSrc.includes('findFirst')) {
+    record('High Priority', 'H9 image access query', 'pass', 'Targeted pathname lookup (no full RO scan)');
+  } else {
+    record('High Priority', 'H9 image access query', 'fail', 'Image access still scans all repair orders');
+  }
+
+  const listSrc = readFileSync(resolve(process.cwd(), 'src/app/api/repair-orders/route.ts'), 'utf8');
+  if (listSrc.includes('nextCursor') && listSrc.includes('hasMore')) {
+    record('High Priority', 'H10 RO list pagination', 'pass', 'Cursor-based repair order listing');
+  } else {
+    record('High Priority', 'H10 RO list pagination', 'fail', 'Repair order list still unbounded');
+  }
+
+  const seedDb = readFileSync(resolve(process.cwd(), 'src/lib/seedDatabase.ts'), 'utf8');
+  if (!seedDb.includes('changeme123')) {
+    record('High Priority', 'H11 seed credentials', 'pass', 'No hardcoded default technician password');
+  } else {
+    record('High Priority', 'H11 seed credentials', 'fail', 'Hardcoded seed password still present');
+  }
+
+  const noiseSrc = readFileSync(resolve(process.cwd(), 'src/lib/voice/noiseMonitor.ts'), 'utf8');
+  if (noiseSrc.includes('EMIT_INTERVAL_MS = 250')) {
+    record('High Priority', 'H12 noise throttle', 'pass', 'Noise monitor emits at 4 Hz max');
+  } else {
+    record('High Priority', 'H12 noise throttle', 'fail', 'Noise monitor not throttled');
+  }
+
+  const voiceSrc = readFileSync(resolve(process.cwd(), 'src/lib/voice/VoiceInputService.ts'), 'utf8');
+  if (voiceSrc.includes('if (!started)') && voiceSrc.includes('noiseMonitor.stop')) {
+    record('High Priority', 'H13 voice cleanup', 'pass', 'Noise monitor stopped when recognition fails');
+  } else {
+    record('High Priority', 'H13 voice cleanup', 'fail', 'Voice start failure cleanup incomplete');
+  }
+
+  const cpTpl = readFileSync(resolve(process.cwd(), 'src/lib/customerPayTemplate.ts'), 'utf8');
+  if (cpTpl.includes('if (!template.isCustomerPay)')) {
+    record('High Priority', 'H14 template eligibility', 'pass', 'Customer Pay bypass requires isCustomerPay=true');
+  } else {
+    record('High Priority', 'H14 template eligibility', 'fail', 'Loose template eligibility still present');
+  }
+
+  const pkg = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8')) as {
+    scripts?: { build?: string; 'db:migrate:deploy'?: string };
+  };
+  const buildScript = pkg.scripts?.build ?? '';
+  if (
+    !buildScript.includes('prisma migrate deploy') &&
+    pkg.scripts?.['db:migrate:deploy']?.includes('prisma migrate deploy')
+  ) {
+    record('High Priority', 'H15 build migrations', 'pass', 'Build no longer runs prisma migrate deploy');
+  } else {
+    record('High Priority', 'H15 build migrations', 'fail', 'Build still auto-runs migrations');
+  }
+}
+
 async function checkCoreFeatures(): Promise<void> {
   section('Core Feature Tests');
 
@@ -1079,6 +1189,7 @@ async function main(): Promise<void> {
   await checkCoreSystems();
   await checkCustomerPayTemplates();
   await checkCriticalAuditFixes();
+  await checkHighPriorityAuditFixes();
   await checkCoreFeatures();
   await checkDocumentation();
   await checkSecurityAndConfig();

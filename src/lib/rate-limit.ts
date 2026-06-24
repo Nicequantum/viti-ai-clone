@@ -64,6 +64,15 @@ export function isKvConfigured(): boolean {
   return Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 }
 
+function effectiveRateLimitConfig(config: RateLimitConfig): RateLimitConfig {
+  if (isKvConfigured()) return config;
+  // H8: without KV, per-instance memory limits are weaker — apply a stricter ceiling.
+  return {
+    limit: Math.max(1, Math.floor(config.limit / 2)),
+    windowMs: config.windowMs,
+  };
+}
+
 export async function checkRateLimit(
   request: Request,
   routeKey: string,
@@ -80,9 +89,15 @@ export async function checkRateLimit(
         error: error instanceof Error ? error.message : 'unknown',
       });
     }
+  } else if (process.env.NODE_ENV === 'production') {
+    logger.warn('rate_limit.memory_only', {
+      routeKey,
+      detail:
+        'KV_REST_API_URL/TOKEN not configured — limits are per serverless instance at 50% strength',
+    });
   }
 
-  return checkMemoryRateLimit(key, config);
+  return checkMemoryRateLimit(key, effectiveRateLimitConfig(config));
 }
 
 export function getRequestIp(request: Request): string {

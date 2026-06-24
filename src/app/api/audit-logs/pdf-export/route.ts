@@ -1,4 +1,5 @@
 import { writeAuditLog } from '@/lib/audit';
+import { isCustomerPayRepairLine } from '@/lib/customerPayLine';
 import { PROMPT_VERSION } from '@/prompts/version';
 import { withAuth } from '@/lib/apiRoute';
 import { prisma } from '@/lib/db';
@@ -22,27 +23,43 @@ export async function POST(request: Request) {
           repairOrderId,
           repairOrder: { dealershipId: session.dealershipId },
         },
-        select: { id: true, lineNumber: true },
+        select: { id: true, lineNumber: true, isCustomerPay: true },
       });
 
       if (!line) {
         return apiError(VALIDATION_ERROR, 400);
       }
 
-      await writeAuditLog({
-        action: 'story.pdf_export',
-        dealershipId: session.dealershipId,
-        technicianId: session.technicianId,
-        entityType: 'repairLine',
-        entityId: repairLineId,
-        promptVersion: PROMPT_VERSION,
-        metadata: {
-          repairOrderId,
-          lineNumber: line.lineNumber,
+      // H4: Customer Pay PDF exports use sentinel audit — not Merlin story.pdf_export.
+      if (isCustomerPayRepairLine(line)) {
+        await writeAuditLog({
+          action: 'customerPayStory.pdf_export',
+          dealershipId: session.dealershipId,
+          technicianId: session.technicianId,
+          entityType: 'repairLine',
+          entityId: repairLineId,
+          metadata: {
+            repairOrderId,
+            lineNumber: line.lineNumber,
+          },
+          ipAddress: getRequestIp(request),
+        });
+      } else {
+        await writeAuditLog({
+          action: 'story.pdf_export',
+          dealershipId: session.dealershipId,
+          technicianId: session.technicianId,
+          entityType: 'repairLine',
+          entityId: repairLineId,
           promptVersion: PROMPT_VERSION,
-        },
-        ipAddress: getRequestIp(request),
-      });
+          metadata: {
+            repairOrderId,
+            lineNumber: line.lineNumber,
+            promptVersion: PROMPT_VERSION,
+          },
+          ipAddress: getRequestIp(request),
+        });
+      }
 
       if (durationMs != null) {
         logPerformance('client.pdf.export', durationMs, {

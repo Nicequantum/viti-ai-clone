@@ -1,23 +1,38 @@
-export function debounce<T extends (...args: never[]) => void>(fn: T, ms: number): T & { flush: () => void; cancel: () => void } {
+export function debounce<T extends (...args: never[]) => void | Promise<void>>(
+  fn: T,
+  ms: number
+): T & { flush: () => Promise<void>; cancel: () => void } {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let lastArgs: Parameters<T> | null = null;
+  let flushInFlight: Promise<void> | null = null;
 
   const debounced = ((...args: Parameters<T>) => {
     lastArgs = args;
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
       timer = null;
-      if (lastArgs) fn(...lastArgs);
-      lastArgs = null;
+      if (lastArgs) {
+        void Promise.resolve(fn(...lastArgs));
+        lastArgs = null;
+      }
     }, ms);
-  }) as T & { flush: () => void; cancel: () => void };
+  }) as T & { flush: () => Promise<void>; cancel: () => void };
 
-  debounced.flush = () => {
+  // H2: awaitable flush so callers can serialize with other saves.
+  debounced.flush = async () => {
+    if (flushInFlight) {
+      await flushInFlight;
+      return;
+    }
     if (timer && lastArgs) {
       clearTimeout(timer);
       timer = null;
-      fn(...lastArgs);
+      const args = lastArgs;
       lastArgs = null;
+      flushInFlight = Promise.resolve(fn(...args)).finally(() => {
+        flushInFlight = null;
+      });
+      await flushInFlight;
     }
   };
 

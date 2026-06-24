@@ -14,6 +14,7 @@ import {
   StoryQualityStaleBanner,
 } from '@/components/StoryQualityPanel';
 import { TemplateLibraryModal } from '@/components/TemplateLibraryModal';
+import { isCustomerPayRepairLine } from '@/lib/customerPayLine';
 import type { RepairLine, RepairOrder, StoryQualityResult, StoryReviewResult, TemplateCategory } from '@/types';
 import { WARRANTY_STORY_MAX_CHARS, WARRANTY_STORY_WARN_CHARS } from '@/types';
 import { getSuggestions } from '@/utils/mercedesKb';
@@ -74,7 +75,7 @@ export function LineView({
   onApplyCustomerPayTemplate,
   onAcknowledgeStoryBaseline,
 }: LineViewProps) {
-  const isCustomerPayLine = line.isCustomerPay === true;
+  const isCustomerPayLine = isCustomerPayRepairLine(line);
   const vehicleSummary = [ro.vehicle.year, ro.vehicle.make, ro.vehicle.model].filter(Boolean).join(' ') || 'Vehicle';
   const mileageStr = ro.vehicle.mileageIn ? `${ro.vehicle.mileageIn} mi` : '';
   const suggestions = getSuggestions(ro);

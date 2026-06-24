@@ -106,7 +106,15 @@ export const api = {
       body: JSON.stringify({ currentPassword, newPassword }),
     }),
 
-  listRepairOrders: () => apiFetch<{ repairOrders: RepairOrder[] }>('/api/repair-orders'),
+  listRepairOrders: (params?: { limit?: number; cursor?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.cursor) query.set('cursor', params.cursor);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return apiFetch<{ repairOrders: RepairOrder[]; nextCursor?: string | null; hasMore?: boolean }>(
+      `/api/repair-orders${suffix}`
+    );
+  },
 
   getRepairOrder: (id: string) => apiFetch<{ repairOrder: RepairOrder }>(`/api/repair-orders/${id}`),
 

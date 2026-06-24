@@ -24,10 +24,14 @@ describe('Customer Pay templates', () => {
     }
   });
 
-  it('identifies customer pay template rows', () => {
+  it('identifies customer pay template rows by explicit flag only (H14)', () => {
     assert.equal(
       templateRowIsCustomerPay({ isCustomerPay: true, templateType: 'CustomerPay', category: 'customer' }),
       true
+    );
+    assert.equal(
+      templateRowIsCustomerPay({ isCustomerPay: false, templateType: 'CustomerPay', category: 'customer' }),
+      false
     );
     assert.equal(
       templateRowIsCustomerPay({ isCustomerPay: false, templateType: 'Warranty', category: 'warranty' }),

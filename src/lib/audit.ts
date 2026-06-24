@@ -31,10 +31,16 @@ export type AuditAction =
   | 'advisor.resolve'
   | 'advisor.capture'
   | 'template.save'
-  | 'customerPayTemplateApplied';
+  | 'customerPayTemplateApplied'
+  | 'customerPayStory.edit'
+  | 'customerPayStory.pdf_export';
 
-/** Customer Pay — lightweight audit; no Merlin promptVersion (see writeCustomerPayTemplateAudit). */
-export const CUSTOMER_PAY_AUDIT_ACTIONS: ReadonlySet<AuditAction> = new Set(['customerPayTemplateApplied']);
+/** Customer Pay — lightweight audit; no Merlin promptVersion. */
+export const CUSTOMER_PAY_AUDIT_ACTIONS: ReadonlySet<AuditAction> = new Set([
+  'customerPayTemplateApplied',
+  'customerPayStory.edit',
+  'customerPayStory.pdf_export',
+]);
 
 /**
  * Compliance-critical audit actions — DB write failure must abort the parent operation (C2).
@@ -144,6 +150,9 @@ export async function writeAuditLog(input: AuditLogInput): Promise<void> {
     const createdAt = new Date();
 
     await prisma.$transaction(async (tx) => {
+      // H5: per-dealership advisory lock prevents concurrent hash-chain forks.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.dealershipId}::text))`;
+
       const last = await tx.auditLog.findFirst({
         where: { dealershipId: input.dealershipId },
         orderBy: { createdAt: 'desc' },

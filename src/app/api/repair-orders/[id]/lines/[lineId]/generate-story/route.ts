@@ -14,6 +14,7 @@ import {
   seedTemplateLibraryIfEmpty,
   selectRelevantKnowledgeEntries,
 } from '@/lib/templateLibrary';
+import { isCustomerPayRepairLine } from '@/lib/customerPayLine';
 import { encryptOptionalSensitiveText } from '@/lib/encryption';
 import { dbToRepairOrder } from '@/lib/roMapper';
 import { apiError, NOT_FOUND_ERROR } from '@/lib/errors';
@@ -46,7 +47,7 @@ export async function POST(
       if (!line) return apiError(NOT_FOUND_ERROR, 404);
 
       const dbLine = ro.repairLines.find((l) => l.id === lineId);
-      if (dbLine?.isCustomerPay) {
+      if (isCustomerPayRepairLine(dbLine)) {
         return apiError(
           'This line uses a Customer Pay template. AI warranty generation is not required — edit the story or clear Customer Pay mode from the template library.',
           400

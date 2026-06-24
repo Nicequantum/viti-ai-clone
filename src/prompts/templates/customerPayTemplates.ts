@@ -95,8 +95,8 @@ export function isCustomerPayTemplateType(templateType: string | null | undefine
 
 export function templateRowIsCustomerPay(row: {
   isCustomerPay: boolean;
-  templateType: string;
-  category: string;
+  templateType?: string;
+  category?: string;
 }): boolean {
-  return row.isCustomerPay || isCustomerPayTemplateType(row.templateType) || row.category === 'customer';
+  return row.isCustomerPay === true;
 }

@@ -1,9 +1,6 @@
 import { verifyPassword } from './auth';
 import { prisma } from './db';
 
-/** Known default password used for the technician seed account when TECH_SEED_PASSWORD is unset. */
-export const DEFAULT_TECH_SEED_PASSWORD = 'changeme123';
-
 function getSeedD7Numbers(): { managerD7: string; techD7: string } {
   return {
     managerD7: (process.env.ADMIN_SEED_D7?.trim() || 'D7HARRIH').toUpperCase(),
@@ -19,7 +16,7 @@ export interface SeedSecurityStatus {
 
 export async function checkSeedPasswordSecurity(): Promise<SeedSecurityStatus> {
   const { managerD7, techD7 } = getSeedD7Numbers();
-  const techSeedPassword = process.env.TECH_SEED_PASSWORD?.trim() || DEFAULT_TECH_SEED_PASSWORD;
+  const techSeedPassword = process.env.TECH_SEED_PASSWORD?.trim();
 
   const accounts = await prisma.technician.findMany({
     where: { d7Number: { in: [managerD7, techD7] } },
@@ -30,14 +27,12 @@ export async function checkSeedPasswordSecurity(): Promise<SeedSecurityStatus> {
   const warnings: string[] = [];
 
   for (const account of accounts) {
-    if (account.d7Number === techD7) {
+    if (account.d7Number === techD7 && techSeedPassword) {
       const matchesTechSeed = await verifyPassword(techSeedPassword, account.passwordHash);
       if (matchesTechSeed) {
         accountsUsingDefaults.push(account.d7Number);
         warnings.push(
-          techSeedPassword === DEFAULT_TECH_SEED_PASSWORD
-            ? 'Technician seed account still uses the default password (changeme123).'
-            : 'Technician account password matches TECH_SEED_PASSWORD — change it before production use.'
+          'Technician account password still matches TECH_SEED_PASSWORD — change it before production use.'
         );
       }
     }
@@ -52,12 +47,6 @@ export async function checkSeedPasswordSecurity(): Promise<SeedSecurityStatus> {
             'Manager account password matches ADMIN_SEED_PASSWORD — change it before production use.'
           );
         }
-      }
-
-      const stillDefaultTech = await verifyPassword(DEFAULT_TECH_SEED_PASSWORD, account.passwordHash);
-      if (stillDefaultTech) {
-        accountsUsingDefaults.push(account.d7Number);
-        warnings.push('Manager account still uses a known default password.');
       }
     }
   }

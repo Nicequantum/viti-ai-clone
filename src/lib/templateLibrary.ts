@@ -347,8 +347,9 @@ export function getTemplateInsertText(template: StoryTemplate): string {
   return template.content;
 }
 
+/** H14: UI instant-apply path requires explicit isCustomerPay on the template row. */
 export function isCustomerPayStoryTemplate(template: StoryTemplate): boolean {
-  return template.isCustomerPay === true || template.templateType === 'CustomerPay' || template.category === 'customer';
+  return template.isCustomerPay === true;
 }
 
 export { listLoadedKnowledgeBaseOriginals };

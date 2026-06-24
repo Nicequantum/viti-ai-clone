@@ -23,7 +23,9 @@ import {
   rebuildExtractedFromOcrTexts,
 } from '@/utils/diagnosticParser';
 import { getSuggestions } from '@/utils/mercedesKb';
+import { isCustomerPayRepairLine } from '@/lib/customerPayLine';
 import { debounce } from '@/lib/debounce';
+import { awaitRepairOrderSaveQueue, enqueueRepairOrderSave } from '@/lib/repairOrderSaveQueue';
 import {
   createManualRepairOrder,
   createNewRepairLine,
@@ -129,15 +131,17 @@ export function useRepairOrders({
 
   const persistRO = useCallback(
     async (ro: RepairOrder): Promise<RepairOrder> => {
-      const isNew = !allROs.some((r) => r.id === ro.id) || ro.id.startsWith('ro-');
-      if (isNew && ro.id.startsWith('ro-')) {
-        const { repairOrder } = await api.createRepairOrder(ro);
-        setAllROs((prev) => [repairOrder, ...prev.filter((r) => r.id !== ro.id)]);
+      return enqueueRepairOrderSave(async () => {
+        const isNew = !allROs.some((r) => r.id === ro.id) || ro.id.startsWith('ro-');
+        if (isNew && ro.id.startsWith('ro-')) {
+          const { repairOrder } = await api.createRepairOrder(ro);
+          setAllROs((prev) => [repairOrder, ...prev.filter((r) => r.id !== ro.id)]);
+          return repairOrder;
+        }
+        const { repairOrder } = await api.updateRepairOrder(ro.id, ro);
+        setAllROs((prev) => prev.map((r) => (r.id === repairOrder.id ? repairOrder : r)));
         return repairOrder;
-      }
-      const { repairOrder } = await api.updateRepairOrder(ro.id, ro);
-      setAllROs((prev) => prev.map((r) => (r.id === repairOrder.id ? repairOrder : r)));
-      return repairOrder;
+      });
     },
     [allROs]
   );
@@ -180,8 +184,9 @@ export function useRepairOrders({
     }, 450)
   );
 
-  const flushPendingSave = useCallback(() => {
-    debouncedPersistRef.current.flush();
+  const flushPendingSave = useCallback(async () => {
+    await debouncedPersistRef.current.flush();
+    await awaitRepairOrderSaveQueue();
   }, []);
 
   const scheduleSaveRO = useCallback((ro: RepairOrder) => {
@@ -197,7 +202,7 @@ export function useRepairOrders({
       setCurrentRO(updated);
       setAllROs((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
       if (options?.immediate) {
-        flushPendingSave();
+        debouncedPersistRef.current.cancel();
         void saveROImmediate(updated);
       } else {
         scheduleSaveRO(updated);
@@ -1049,7 +1054,7 @@ export function useRepairOrders({
 
   const applyCustomerPayTemplate = useCallback(
     async (lineId: string, templateId: string) => {
-      flushPendingSave();
+      await flushPendingSave();
       const latestRO = roRef.current;
       if (!latestRO) return;
       const roId = latestRO.id;
@@ -1107,7 +1112,7 @@ export function useRepairOrders({
         toast.error('Repair line not found — refresh the RO and try again');
         return;
       }
-      if (targetLine.isCustomerPay) {
+      if (isCustomerPayRepairLine(targetLine)) {
         toast.error('Customer Pay line — story is already set. Edit directly or pick another template.');
         return;
       }
@@ -1187,7 +1192,7 @@ export function useRepairOrders({
       flushPendingSave();
       const latestRO = roRef.current;
       const targetLine = latestRO?.repairLines.find((l) => l.id === lineId);
-      if (targetLine?.isCustomerPay) {
+      if (isCustomerPayRepairLine(targetLine)) {
         toast.message('Customer Pay stories skip AI review — edit the text if needed.');
         return;
       }

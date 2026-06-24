@@ -38,31 +38,34 @@ function imageJsonContainsPathname(raw: string, pathname: string): boolean {
   return pathnamesFromImageJson(raw).includes(pathname);
 }
 
+/** H9: targeted lookup — avoid scanning every RO in the dealership. */
+async function repairOrderContainsPathname(
+  session: ImageAccessSession,
+  pathname: string
+): Promise<boolean> {
+  const roWhere = {
+    dealershipId: session.dealershipId,
+    ...(session.role === 'manager' ? {} : { technicianId: session.technicianId }),
+    OR: [
+      { xentryImageUrls: { contains: pathname } },
+      { repairLines: { some: { xentryImageUrls: { contains: pathname } } } },
+    ],
+  };
+
+  const match = await prisma.repairOrder.findFirst({
+    where: roWhere,
+    select: { id: true },
+  });
+  return Boolean(match);
+}
+
 /** True when the session may read this private blob (RO attachment or recent own upload). */
 export async function userCanAccessImage(
   session: ImageAccessSession,
   pathname: string
 ): Promise<boolean> {
-  const orders = await prisma.repairOrder.findMany({
-    where: {
-      dealershipId: session.dealershipId,
-      ...(session.role === 'manager' ? {} : { technicianId: session.technicianId }),
-    },
-    select: {
-      xentryImageUrls: true,
-      repairLines: { select: { xentryImageUrls: true } },
-    },
-  });
-
-  for (const order of orders) {
-    if (imageJsonContainsPathname(order.xentryImageUrls, pathname)) {
-      return true;
-    }
-    for (const line of order.repairLines) {
-      if (imageJsonContainsPathname(line.xentryImageUrls, pathname)) {
-        return true;
-      }
-    }
+  if (await repairOrderContainsPathname(session, pathname)) {
+    return true;
   }
 
   // Allow freshly uploaded images not yet attached to an RO (same dealership session)
@@ -72,24 +75,13 @@ export async function userCanAccessImage(
       dealershipId: session.dealershipId,
       technicianId: session.technicianId,
       createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) },
+      metadata: { contains: pathname },
     },
-    select: { metadata: true },
-    orderBy: { createdAt: 'desc' },
-    take: 100,
+    select: { id: true },
+    take: 1,
   });
 
-  for (const entry of recentUploads) {
-    try {
-      const metadata = JSON.parse(entry.metadata) as { pathname?: string };
-      if (metadata.pathname === pathname) {
-        return true;
-      }
-    } catch {
-      // ignore malformed audit metadata
-    }
-  }
-
-  return false;
+  return recentUploads.length > 0;
 }
 
 /** Returns the first pathname the session may not attach, or null when all are allowed. */

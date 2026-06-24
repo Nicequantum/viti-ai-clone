@@ -8,6 +8,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const REQUIRED = ['DATABASE_URL', 'ENCRYPTION_KEY', 'SESSION_SECRET'];
+const PRODUCTION_REQUIRED = ['KV_REST_API_URL', 'KV_REST_API_TOKEN'];
 
 function loadDotEnvFile(filename) {
   const path = resolve(process.cwd(), filename);
@@ -31,7 +32,11 @@ loadDotEnvFile('.env');
 loadDotEnvFile('.env.local');
 loadDotEnvFile('.env.production');
 
-const missing = REQUIRED.filter((key) => !process.env[key]?.trim());
+const isProduction =
+  process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+const missing = [...REQUIRED, ...(isProduction ? PRODUCTION_REQUIRED : [])].filter(
+  (key) => !process.env[key]?.trim()
+);
 if (missing.length > 0) {
   console.error(`[merlin:build] Missing required environment variables: ${missing.join(', ')}`);
   console.error('[merlin:build] Configure .env.local or your CI/CD secret store before building.');

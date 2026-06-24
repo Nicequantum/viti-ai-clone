@@ -1,4 +1,5 @@
 import { writeAuditLog } from '@/lib/audit';
+import { isCustomerPayRepairLine } from '@/lib/customerPayLine';
 import { PROMPT_VERSION } from '@/prompts/version';
 import { withAuth } from '@/lib/apiRoute';
 import {
@@ -75,13 +76,20 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         repairLines: data.repairLines,
       };
 
-      const storyEdits: Array<{ lineId: string; lineNumber: number }> = [];
+      const storyEdits: Array<{ lineId: string; lineNumber: number; isCustomerPay: boolean }> = [];
       if (data.repairLines) {
         for (const line of data.repairLines) {
           if (!line.id || line.warrantyStory === undefined) continue;
           const prev = existingMapped.repairLines.find((l) => l.id === line.id);
+          const existingLine = existing.repairLines.find((l) => l.id === line.id);
           if (prev && prev.warrantyStory !== line.warrantyStory) {
-            storyEdits.push({ lineId: line.id, lineNumber: prev.lineNumber });
+            const isCustomerPay =
+              line.isCustomerPay === true || existingLine?.isCustomerPay === true;
+            storyEdits.push({
+              lineId: line.id,
+              lineNumber: prev.lineNumber,
+              isCustomerPay,
+            });
           }
         }
       }
@@ -197,16 +205,29 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       });
 
       for (const edit of storyEdits) {
-        await writeAuditLog({
-          action: 'story.edit',
-          dealershipId: session.dealershipId,
-          technicianId: session.technicianId,
-          entityType: 'repairLine',
-          entityId: edit.lineId,
-          promptVersion: PROMPT_VERSION,
-          metadata: { repairOrderId: id, lineNumber: edit.lineNumber, promptVersion: PROMPT_VERSION },
-          ipAddress: getRequestIp(request),
-        });
+        // H3: Customer Pay manual edits use lightweight audit — not Merlin story.edit.
+        if (edit.isCustomerPay) {
+          await writeAuditLog({
+            action: 'customerPayStory.edit',
+            dealershipId: session.dealershipId,
+            technicianId: session.technicianId,
+            entityType: 'repairLine',
+            entityId: edit.lineId,
+            metadata: { repairOrderId: id, lineNumber: edit.lineNumber },
+            ipAddress: getRequestIp(request),
+          });
+        } else {
+          await writeAuditLog({
+            action: 'story.edit',
+            dealershipId: session.dealershipId,
+            technicianId: session.technicianId,
+            entityType: 'repairLine',
+            entityId: edit.lineId,
+            promptVersion: PROMPT_VERSION,
+            metadata: { repairOrderId: id, lineNumber: edit.lineNumber, promptVersion: PROMPT_VERSION },
+            ipAddress: getRequestIp(request),
+          });
+        }
       }
 
       return { repairOrder: dbToRepairOrder(updated!) };

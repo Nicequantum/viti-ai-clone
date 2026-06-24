@@ -33,7 +33,10 @@ describe('tenant isolation (route handlers)', () => {
   const privatePathname = 'benz-tech/tenant-isolation-private.jpg';
 
   before(async () => {
-    const passwordHash = await bcrypt.hash('changeme123', 12);
+    // Synthetic tenant fixtures — never use seed/default passwords in source (H11).
+    const integrationPassword =
+      process.env.INTEGRATION_TEST_PASSWORD?.trim() || `tenant-isolation-${Date.now()}`;
+    const passwordHash = await bcrypt.hash(integrationPassword, 12);
 
     const dealershipA = await prisma.dealership.upsert({
       where: { id: 'tenant-test-a' },

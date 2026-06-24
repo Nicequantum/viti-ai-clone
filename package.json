@@ -6,7 +6,7 @@
     "dev": "next dev",
     "validate:env": "node scripts/validate-env.mjs",
     "validate:pre-rollout": "tsx scripts/pre-rollout-validation.ts",
-    "build": "node scripts/validate-env.mjs && prisma generate && prisma migrate deploy && next build",
+    "build": "node scripts/validate-env.mjs && prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "db:migrate": "prisma migrate dev",

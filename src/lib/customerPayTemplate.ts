@@ -42,7 +42,8 @@ export async function applyCustomerPayTemplate(
     throw new Error('Template not found');
   }
 
-  if (!template.isCustomerPay && template.templateType !== 'CustomerPay' && template.category !== 'customer') {
+  // H14: explicit flag only — category/templateType alone cannot trigger compliance bypass.
+  if (!template.isCustomerPay) {
     throw new Error('This template is not a Customer Pay template');
   }
 

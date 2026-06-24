@@ -131,6 +131,7 @@ export class VoiceInputService {
       await this.noiseMonitor.start(this.settings);
       await this.refreshPermission();
     } catch {
+      await this.noiseMonitor.stop();
       this.patchState({
         listeningState: 'error',
         isListening: false,
@@ -142,7 +143,12 @@ export class VoiceInputService {
       return false;
     }
 
-    return this.startRecognition(Ctor);
+    const started = this.startRecognition(Ctor);
+    if (!started) {
+      // H13: release mic stream when SpeechRecognition fails to start.
+      await this.noiseMonitor.stop();
+    }
+    return started;
   }
 
   /** Stop recognition gracefully (final results may still flush). */
@@ -252,6 +258,7 @@ export class VoiceInputService {
       this.resetListeningTimeout();
       return true;
     } catch {
+      void this.noiseMonitor.stop();
       this.patchState({ listeningState: 'error', isListening: false });
       return false;
     }
