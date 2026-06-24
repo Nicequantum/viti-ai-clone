@@ -26,6 +26,7 @@ export function BenzTechApp() {
   const { session, loading: sessionLoading, login, logout, acceptConsent } = useSession();
   const ocr = useOcrProgress();
   const ro = useRepairOrders({
+    session,
     onOcrStart: ocr.startOcr,
     onOcrFinish: ocr.finishOcr,
     setOcrProgress: ocr.setOcrProgress,
@@ -35,6 +36,10 @@ export function BenzTechApp() {
 
   if (sessionLoading) {
     return <LoadingScreen label="Starting Merlin" sublabel="Verifying your session..." />;
+  }
+
+  if (!session) {
+    return <LoginView onLogin={login} />;
   }
 
   if (ro.loading && !ro.listError) {
@@ -50,10 +55,6 @@ export function BenzTechApp() {
         retrying={ro.listRetrying}
       />
     );
-  }
-
-  if (!session) {
-    return <LoginView onLogin={login} />;
   }
 
   if (!session.consentAt) {

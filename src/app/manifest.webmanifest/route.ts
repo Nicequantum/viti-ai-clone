@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getPwaManifest } from '@/lib/pwaManifest';
 
-/** Public manifest alias for legacy /manifest.json requests. */
+/** Public PWA manifest — no session required. */
 export function GET() {
   return NextResponse.json(getPwaManifest(), {
     headers: {

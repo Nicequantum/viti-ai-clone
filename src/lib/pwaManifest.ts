@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
 
-export default function manifest(): MetadataRoute.Manifest {
+export function getPwaManifest(): MetadataRoute.Manifest {
   return {
     name: 'Merlin — Mercedes-Benz Warranty Platform',
     short_name: 'Merlin',

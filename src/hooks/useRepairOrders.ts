@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { clientLog } from '@/lib/clientLog';
 import { runDiagnosticOCR, runMultiPassOCR } from '@/services/ocr';
 import type {
@@ -14,6 +14,7 @@ import type {
   RepairOrder,
   StoryQualityResult,
   StoryReviewResult,
+  TechnicianSession,
 } from '@/types';
 import {
   emptyExtractedData,
@@ -54,6 +55,7 @@ import { extractVmiWarrantyInfo, mergeVehicleWarrantyInfo } from '@/utils/vmiExt
 import { uploadFileAsAttachment, uploadFilesAsAttachments } from '@/utils/uploadHelpers';
 
 interface UseRepairOrdersOptions {
+  session: TechnicianSession | null;
   onOcrStart: (message?: string) => void;
   onOcrFinish: () => void;
   setOcrProgress: (p: number) => void;
@@ -61,6 +63,7 @@ interface UseRepairOrdersOptions {
 }
 
 export function useRepairOrders({
+  session,
   onOcrStart,
   onOcrFinish,
   setOcrProgress,
@@ -108,18 +111,31 @@ export function useRepairOrders({
   }, []);
 
   const refreshList = useCallback(async () => {
+    if (!session) {
+      setAllROs([]);
+      setListError(null);
+      setLoading(false);
+      setListRetrying(false);
+      return;
+    }
+
     setListError(null);
     try {
       const { repairOrders } = await api.listRepairOrders();
       setAllROs(repairOrders.map(normalizeRepairOrder));
     } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setAllROs([]);
+        setListError(null);
+        return;
+      }
       setListError('Could not load repair orders. Check your connection and try again.');
       throw error;
     } finally {
       setLoading(false);
       setListRetrying(false);
     }
-  }, [normalizeRepairOrder]);
+  }, [normalizeRepairOrder, session]);
 
   const retryListLoad = useCallback(async () => {
     setListRetrying(true);
@@ -132,10 +148,18 @@ export function useRepairOrders({
   }, [refreshList]);
 
   useEffect(() => {
+    if (!session) {
+      setLoading(false);
+      setListError(null);
+      setAllROs([]);
+      return;
+    }
+
+    setLoading(true);
     refreshList().catch(() => {
       toast.error('Could not load repair orders — check your connection');
     });
-  }, [refreshList]);
+  }, [session, refreshList]);
 
   /** Prevent blank screen when view points at RO/line but selection was cleared mid-scan. */
   useEffect(() => {
