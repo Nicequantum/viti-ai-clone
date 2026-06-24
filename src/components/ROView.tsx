@@ -83,7 +83,7 @@ export function ROView({
         )}
       </div>
 
-      <div className="benz-card p-5 sm:p-6 mb-6 space-y-4">
+      <div className="benz-card p-5 sm:p-6 mb-6 space-y-4 min-w-0 w-full">
         <div>
           <div className="benz-section-title mb-1">RO Details</div>
           <p className="benz-hint">From first scan block — RO#, vehicle fields, and complaints from any page</p>
@@ -100,8 +100,8 @@ export function ROView({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="min-w-0">
             <label className="benz-label">Year</label>
             <StableInput
               fieldKey={`${ro.id}-year`}
@@ -111,7 +111,7 @@ export function ROView({
               className="benz-input"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="benz-label">Make</label>
             <StableInput
               fieldKey={`${ro.id}-make`}
@@ -121,7 +121,7 @@ export function ROView({
               className="benz-input"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="benz-label">Model</label>
             <StableInput
               fieldKey={`${ro.id}-model`}
@@ -131,7 +131,7 @@ export function ROView({
               className="benz-input"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="benz-label">Mileage In</label>
             <StableInput
               fieldKey={`${ro.id}-mileageIn`}
@@ -141,7 +141,7 @@ export function ROView({
               className="benz-input"
             />
           </div>
-          <div className="col-span-2 sm:col-span-1">
+          <div className="min-w-0 sm:col-span-2 lg:col-span-1">
             <label className="benz-label">Mileage Out</label>
             <StableInput
               fieldKey={`${ro.id}-mileageOut`}
@@ -155,14 +155,14 @@ export function ROView({
 
         <div>
           <label className="benz-label">VIN</label>
-          <div className="flex gap-2">
+          <div className="flex gap-2 min-w-0">
             <StableInput
               fieldKey={`${ro.id}-vin`}
               value={ro.vehicle.vin}
               onChange={(v) => onUpdateVehicle('vin', v.toUpperCase())}
               placeholder="W1Nxxxx..."
               maxLength={17}
-              className="benz-input benz-input-mono flex-1"
+              className="benz-input benz-input-mono flex-1 min-w-0"
             />
             <button
               onClick={onDecodeVin}
@@ -216,13 +216,15 @@ export function ROView({
                 return (
                   <div key={stableId} className="benz-complaint-row">
                     <div className="benz-complaint-label">{label}.</div>
-                    <StableTextarea
-                      fieldKey={stableId}
-                      value={c}
-                      onChange={(v) => onEditComplaint(idx, v)}
-                      placeholder="Describe customer concern or symptom..."
-                      className="benz-textarea flex-1 min-h-[52px]"
-                    />
+                    <div className="benz-complaint-field">
+                      <StableTextarea
+                        fieldKey={stableId}
+                        value={c}
+                        onChange={(v) => onEditComplaint(idx, v)}
+                        placeholder="Describe customer concern or symptom..."
+                        className="benz-textarea min-h-[52px]"
+                      />
+                    </div>
                     <button
                       onClick={() => onRemoveComplaint(idx)}
                       className="benz-danger-icon-btn mt-2"
@@ -288,12 +290,14 @@ export function ROView({
             onClick={() => onOpenLine(line.id)}
             className="benz-line-card flex justify-between items-center gap-3"
           >
-            <div className="min-w-0">
-              <div className="font-semibold text-[15px] tracking-tight">
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold text-[15px] tracking-tight break-words leading-snug">
                 Line {line.lineNumber}: {line.description}
               </div>
               {line.customerConcern && (
-                <div className="text-xs text-benz-secondary mt-1 truncate max-w-[260px]">{line.customerConcern}</div>
+                <div className="text-xs text-benz-secondary mt-1 break-words leading-relaxed line-clamp-2">
+                  {line.customerConcern}
+                </div>
               )}
               {line.warrantyStory && (
                 isCustomerPayRepairLine(line) ? (

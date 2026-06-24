@@ -84,7 +84,7 @@
   }
 
   .benz-page {
-    @apply px-5 pt-5 pb-10;
+    @apply px-5 pt-5 pb-10 w-full min-w-0;
   }
 
   .benz-page-compact {
@@ -117,6 +117,8 @@
     border: 1px solid var(--benz-border-accent);
     border-radius: var(--benz-radius-xl);
     box-shadow: 0 0 0 1px rgba(0, 173, 239, 0.06), var(--benz-shadow-lg);
+    min-width: 0;
+    width: 100%;
   }
 
   .story-card-cp {
@@ -218,13 +220,20 @@
   .benz-input {
     padding: 0.625rem 0.875rem;
     font-size: 0.875rem;
+    min-width: 0;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 
   .benz-textarea {
     padding: 0.875rem 1rem;
     font-size: 0.875rem;
-    line-height: 1.55;
+    line-height: 1.6;
     resize: vertical;
+    min-width: 0;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
   }
 
   .benz-input:focus,
@@ -475,14 +484,28 @@
     display: flex;
     flex-direction: column;
     gap: 2rem;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .benz-line-flow > * {
+    min-width: 0;
+    width: 100%;
   }
 
   @media (min-width: 768px) {
     .benz-line-flow {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 1.5rem;
       align-items: start;
+    }
+
+    .benz-line-flow .benz-line-doc-card,
+    .benz-line-flow .benz-generate-panel,
+    .benz-line-flow .story-card,
+    .benz-line-flow .benz-story-empty-state {
+      grid-column: 1 / -1;
     }
 
     .benz-line-flow .benz-generate-panel {
@@ -493,6 +516,8 @@
 
   .benz-line-doc-card {
     padding: 1.375rem 1.5rem;
+    min-width: 0;
+    width: 100%;
   }
 
   .benz-line-doc-divider {
@@ -694,7 +719,11 @@
   }
 
   .benz-complaint-row {
-    @apply flex gap-2.5 items-start;
+    @apply flex gap-2.5 items-start w-full min-w-0;
+  }
+
+  .benz-complaint-field {
+    @apply min-w-0 flex-1 w-full;
   }
 
   .benz-complaint-label {
@@ -718,6 +747,8 @@
     border-radius: var(--benz-radius-lg);
     padding: 0.875rem 1rem;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    min-width: 0;
+    width: 100%;
   }
 
   .benz-line-title-field:focus-within {
@@ -727,13 +758,17 @@
 
   .benz-line-title-input {
     width: 100%;
+    min-width: 0;
     font-size: 1.375rem;
     font-weight: 700;
     letter-spacing: -0.03em;
+    line-height: 1.35;
     color: var(--benz-text);
     background: transparent;
     border: none;
     outline: none;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 
   .benz-line-title-input::placeholder {

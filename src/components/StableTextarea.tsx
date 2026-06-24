@@ -69,7 +69,7 @@ export function StableTextarea({
   };
 
   return (
-    <div className="flex gap-2 items-start w-full">
+    <div className="flex gap-2 items-start w-full min-w-0">
       <textarea
         ref={textareaRef}
         {...props}
@@ -89,7 +89,7 @@ export function StableTextarea({
           props.onBlur?.(e);
         }}
         onChange={(e) => handleChange(e.target.value)}
-        className={`flex-1 touch-manipulation ${className}`}
+        className={`flex-1 min-w-0 w-full touch-manipulation ${className}`}
       />
       {showVoice && (
         <div className="flex flex-col items-end gap-1 shrink-0 mt-1">

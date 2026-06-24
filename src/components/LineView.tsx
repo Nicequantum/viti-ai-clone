@@ -194,43 +194,47 @@ export function LineView({
 
       <div className="mb-6">
         <label className="benz-label mb-2">Line {line.lineNumber} description</label>
-        <div className="benz-line-title-field flex gap-2 items-center">
+        <div className="benz-line-title-field flex gap-2 items-center min-w-0">
           <StableInput
             fieldKey={`${line.id}-description`}
             value={line.description}
             onChange={(v) => onUpdateLine({ description: v })}
             showVoice
             placeholder="Repair line description"
-            className="benz-line-title-input flex-1"
+            className="benz-line-title-input flex-1 min-w-0"
           />
         </div>
       </div>
 
       <div className="benz-line-flow">
-        <div className="benz-card benz-line-doc-card">
+        <div className="benz-card benz-line-doc-card min-w-0 w-full">
           <label className="benz-label">Customer concern</label>
           <p className="benz-hint mb-3">Prefilled from scan — edit to match advisor wording</p>
-          <StableTextarea
-            fieldKey={`${line.id}-concern`}
-            value={line.customerConcern}
-            onChange={(v) => onUpdateLine({ customerConcern: v })}
-            className="benz-textarea min-h-[80px]"
-            placeholder="Customer stated..."
-          />
+          <div className="benz-complaint-field">
+            <StableTextarea
+              fieldKey={`${line.id}-concern`}
+              value={line.customerConcern}
+              onChange={(v) => onUpdateLine({ customerConcern: v })}
+              className="benz-textarea min-h-[80px]"
+              placeholder="Customer stated..."
+            />
+          </div>
 
           <div className="benz-line-doc-divider" />
 
           <label className="benz-label">Technician notes & findings</label>
-          <StableTextarea
-            fieldKey={`${line.id}-notes`}
-            value={line.technicianNotes}
-            onChange={(v) => onUpdateLine({ technicianNotes: v })}
-            className="benz-textarea min-h-[100px]"
-            placeholder="Document actual test results, findings, and repair steps performed..."
-          />
+          <div className="benz-complaint-field">
+            <StableTextarea
+              fieldKey={`${line.id}-notes`}
+              value={line.technicianNotes}
+              onChange={(v) => onUpdateLine({ technicianNotes: v })}
+              className="benz-textarea min-h-[100px]"
+              placeholder="Document actual test results, findings, and repair steps performed..."
+            />
+          </div>
         </div>
 
-        <div className="benz-card p-5">
+        <div className="benz-card p-5 min-w-0 w-full">
           <div className="benz-section-title mb-1">Diagnostic Evidence</div>
           <p className="benz-hint mb-4">Grok vision + on-device OCR — tap a photo to view or delete</p>
           <button
@@ -373,9 +377,9 @@ export function LineView({
         )}
 
         {line.warrantyStory && (
-          <div className={`story-card p-5 sm:p-6 ${isCustomerPayLine ? 'story-card-cp' : ''}`}>
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center gap-2">
+          <div className={`story-card p-5 sm:p-6 min-w-0 w-full ${isCustomerPayLine ? 'story-card-cp' : ''}`}>
+            <div className="flex justify-between items-start gap-3 mb-4 min-w-0">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
                 <div className="benz-section-title tracking-[0.12em]">
                   {isCustomerPayLine ? 'Customer Pay Story' : "Warranty Story · 3 C's"}
                 </div>
@@ -394,14 +398,16 @@ export function LineView({
                 Exceeds recommended DMS character limit — edit before submission.
               </div>
             )}
-            <StableTextarea
-              id={`warranty-story-${line.id}`}
-              fieldKey={`${line.id}-story`}
-              value={line.warrantyStory}
-              onChange={(v) => onUpdateLine({ warrantyStory: v })}
-              className="benz-textarea text-[15px] leading-relaxed mb-4 min-h-[220px]"
-              placeholder="Edit warranty story before DMS submission..."
-            />
+            <div className="benz-complaint-field">
+              <StableTextarea
+                id={`warranty-story-${line.id}`}
+                fieldKey={`${line.id}-story`}
+                value={line.warrantyStory}
+                onChange={(v) => onUpdateLine({ warrantyStory: v })}
+                className="benz-textarea text-[15px] leading-relaxed mb-4 min-h-[220px]"
+                placeholder="Edit warranty story before DMS submission..."
+              />
+            </div>
             {!isCustomerPayLine && (
               <div className="benz-quality-inset">
                 {isGenerating && <StoryQualityLoadingPanel mode="generating" />}
