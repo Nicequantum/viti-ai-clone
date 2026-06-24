@@ -59,6 +59,7 @@ export async function getAuditDashboardSummary(dealershipId: string): Promise<Au
         ipAddress: true,
         previousHash: true,
         entryHash: true,
+        promptVersion: true,
         createdAt: true,
       },
     }),
@@ -79,6 +80,7 @@ export async function getAuditDashboardSummary(dealershipId: string): Promise<Au
     createdAt: log.createdAt.toISOString(),
     previousHash: log.previousHash,
     entryHash: log.entryHash,
+    promptVersion: log.promptVersion,
   }));
 
   const verification = verifyAuditChain(chainPayload);

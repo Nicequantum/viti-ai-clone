@@ -1,4 +1,5 @@
 import { writeAuditLog } from '@/lib/audit';
+import { PROMPT_VERSION } from '@/prompts/version';
 import { withAuth } from '@/lib/apiRoute';
 import { prisma } from '@/lib/db';
 import { apiError, VALIDATION_ERROR } from '@/lib/errors';
@@ -42,9 +43,11 @@ export async function POST(request: Request) {
         technicianId: session.technicianId,
         entityType: 'repairLine',
         entityId: repairLineId,
+        promptVersion: PROMPT_VERSION,
         metadata: {
           repairOrderId,
           lineNumber: line.lineNumber,
+          promptVersion: PROMPT_VERSION,
         },
         ipAddress: getRequestIp(request),
       });

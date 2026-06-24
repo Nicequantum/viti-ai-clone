@@ -1,4 +1,5 @@
 import { writeAuditLog } from '@/lib/audit';
+import { PROMPT_VERSION } from '@/prompts/version';
 import { withAuth } from '@/lib/apiRoute';
 import {
   captureAdvisorIntelligence,
@@ -196,7 +197,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           technicianId: session.technicianId,
           entityType: 'repairLine',
           entityId: edit.lineId,
-          metadata: { repairOrderId: id, lineNumber: edit.lineNumber },
+          promptVersion: PROMPT_VERSION,
+          metadata: { repairOrderId: id, lineNumber: edit.lineNumber, promptVersion: PROMPT_VERSION },
           ipAddress: getRequestIp(request),
         });
       }

@@ -22,7 +22,7 @@ export async function GET(request: Request) {
       });
 
       if (!line) {
-        return { hash: null };
+        return { hash: null, promptVersion: null };
       }
 
       const latestLog = await prisma.auditLog.findFirst({
@@ -34,10 +34,13 @@ export async function GET(request: Request) {
           entryHash: { not: '' },
         },
         orderBy: { createdAt: 'desc' },
-        select: { entryHash: true },
+        select: { entryHash: true, promptVersion: true },
       });
 
-      return { hash: latestLog?.entryHash ?? null };
+      return {
+        hash: latestLog?.entryHash ?? null,
+        promptVersion: latestLog?.promptVersion ?? null,
+      };
     },
     { rateLimitKey: 'audit-logs.latest' }
   );

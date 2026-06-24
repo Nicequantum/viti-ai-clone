@@ -2,6 +2,12 @@ import { createHash } from 'crypto';
 
 export const AUDIT_GENESIS_HASH = 'GENESIS';
 
+/** Pre-migration audit rows — hash computed without promptVersion in the canonical payload. */
+export const AUDIT_LEGACY_PROMPT_VERSION = 'legacy';
+
+/** Non-AI audit events (login, RO CRUD, etc.) that do not invoke Merlin prompts. */
+export const AUDIT_NON_AI_PROMPT_VERSION = 'n/a';
+
 export interface AuditChainPayload {
   id: string;
   action: string;
@@ -13,9 +19,13 @@ export interface AuditChainPayload {
   ipAddress: string | null;
   createdAt: string;
   previousHash: string;
+  promptVersion: string;
 }
 
-export function computeAuditEntryHash(payload: AuditChainPayload): string {
+type LegacyAuditChainPayload = Omit<AuditChainPayload, 'promptVersion'>;
+
+/** Legacy hash (pre promptVersion column) — preserves chain integrity for migrated rows. */
+export function computeLegacyAuditEntryHash(payload: LegacyAuditChainPayload): string {
   const canonical = JSON.stringify({
     id: payload.id,
     action: payload.action,
@@ -27,6 +37,31 @@ export function computeAuditEntryHash(payload: AuditChainPayload): string {
     ipAddress: payload.ipAddress,
     createdAt: payload.createdAt,
     previousHash: payload.previousHash,
+  });
+  return createHash('sha256').update(canonical).digest('hex');
+}
+
+/**
+ * SHA-256 entry hash. Includes promptVersion so warranty auditors can prove which
+ * Merlin prompt rules produced a given AI story or PDF export.
+ */
+export function computeAuditEntryHash(payload: AuditChainPayload): string {
+  if (payload.promptVersion === AUDIT_LEGACY_PROMPT_VERSION) {
+    return computeLegacyAuditEntryHash(payload);
+  }
+
+  const canonical = JSON.stringify({
+    id: payload.id,
+    action: payload.action,
+    entityType: payload.entityType,
+    entityId: payload.entityId,
+    technicianId: payload.technicianId,
+    dealershipId: payload.dealershipId,
+    metadata: payload.metadata,
+    ipAddress: payload.ipAddress,
+    createdAt: payload.createdAt,
+    previousHash: payload.previousHash,
+    promptVersion: payload.promptVersion,
   });
   return createHash('sha256').update(canonical).digest('hex');
 }

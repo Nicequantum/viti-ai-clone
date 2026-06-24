@@ -3,6 +3,7 @@ import { withAuth } from '@/lib/apiRoute';
 import { prisma } from '@/lib/db';
 import { apiError, NOT_FOUND_ERROR, VALIDATION_ERROR } from '@/lib/errors';
 import { reviewWarrantyStory } from '@/lib/grok';
+import { PROMPT_VERSION } from '@/prompts/version';
 import { dbToRepairOrder } from '@/lib/roMapper';
 import { getRequestIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { parseBody, reviewStorySchema } from '@/lib/validation';
@@ -65,9 +66,11 @@ export async function POST(
         technicianId: session.technicianId,
         entityType: 'repairLine',
         entityId: lineId,
+        promptVersion: PROMPT_VERSION,
         metadata: {
           repairOrderId: id,
           lineNumber: line.lineNumber,
+          promptVersion: PROMPT_VERSION,
           qualityScore: quality.score,
           qualityGrade: quality.grade,
         },

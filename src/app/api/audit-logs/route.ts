@@ -60,10 +60,22 @@ export async function GET(request: Request) {
         ipAddress: log.ipAddress,
         createdAt: log.createdAt.toISOString(),
         entryHash: log.entryHash || null,
+        promptVersion: log.promptVersion,
       }));
 
       if (format === 'csv') {
-        const header = ['id', 'action', 'technicianName', 'entityType', 'entityId', 'ipAddress', 'createdAt', 'entryHash', 'metadata'];
+        const header = [
+          'id',
+          'action',
+          'technicianName',
+          'entityType',
+          'entityId',
+          'ipAddress',
+          'createdAt',
+          'entryHash',
+          'promptVersion',
+          'metadata',
+        ];
         const rows = entries.map((entry) =>
           [
             entry.id,
@@ -74,6 +86,7 @@ export async function GET(request: Request) {
             entry.ipAddress,
             entry.createdAt,
             entry.entryHash,
+            entry.promptVersion,
             JSON.stringify(entry.metadata),
           ]
             .map(toCsvValue)

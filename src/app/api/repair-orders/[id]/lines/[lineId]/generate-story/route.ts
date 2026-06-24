@@ -6,6 +6,7 @@ import {
 } from '@/lib/advisorIntelligence';
 import { prisma } from '@/lib/db';
 import { generateWarrantyStory, scoreWarrantyStory } from '@/lib/grok';
+import { PROMPT_VERSION } from '@/prompts/version';
 import {
   formatKnowledgeBaseForPrompt,
   GLOBAL_DEALERSHIP_ID,
@@ -120,9 +121,11 @@ export async function POST(
         technicianId: session.technicianId,
         entityType: 'repairLine',
         entityId: lineId,
+        promptVersion: PROMPT_VERSION,
         metadata: {
           repairOrderId: id,
           lineNumber: line.lineNumber,
+          promptVersion: PROMPT_VERSION,
           advisorIntelligenceUsed: Boolean(advisorCtx),
           knowledgeBaseEntriesUsed: relevantKb.map((entry) => entry.title),
           serviceAdvisorId: advisorCtx?.serviceAdvisorId ?? null,

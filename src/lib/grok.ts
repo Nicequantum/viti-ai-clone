@@ -13,11 +13,14 @@ import {
   type StoryQualityResult,
   type StoryReviewResult,
 } from '@/prompts/storyQuality';
+import { PROMPT_VERSION } from '@/prompts/version';
 import {
   SYSTEM_PROMPT,
   WARRANTY_STORY_TEMPERATURE,
   buildWarrantyStoryUserMessage,
 } from '@/prompts/warrantyStory';
+
+export { PROMPT_VERSION };
 import type { ExtractedData, RepairLine, RepairOrder } from '@/types';
 import { normalizeExtractedData, parseDiagnosticExtractionJson } from '@/utils/diagnosticParser';
 import { DIAGNOSTIC_EXTRACT_GROK_MS, RO_EXTRACT_GROK_MS } from '@/lib/timeouts';
@@ -76,6 +79,7 @@ export async function generateWarrantyStory(
   advisorContext = '',
   knowledgeBaseContext = ''
 ): Promise<string> {
+  // PROMPT_VERSION is stamped on story.generate audit entries for warranty compliance traceability.
   const systemPrompt = knowledgeBaseContext
     ? `${SYSTEM_PROMPT}\n\n${knowledgeBaseContext}`
     : SYSTEM_PROMPT;

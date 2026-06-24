@@ -128,20 +128,22 @@ export function LineView({
 
     try {
       let auditHash: string | undefined;
+      let promptVersion: string | undefined;
 
       try {
         const res = await fetch(`/api/audit-logs/latest?repairLineId=${encodeURIComponent(line.id)}`, {
           credentials: 'include',
         });
         if (res.ok) {
-          const data = (await res.json()) as { hash?: string | null };
+          const data = (await res.json()) as { hash?: string | null; promptVersion?: string | null };
           auditHash = data.hash ?? undefined;
+          promptVersion = data.promptVersion ?? undefined;
         }
       } catch (err) {
         console.warn('Could not fetch audit hash for PDF:', err);
       }
 
-      exportWarrantyStoryPdf(ro, line, storyText, auditHash, technicianName);
+      exportWarrantyStoryPdf(ro, line, storyText, auditHash, promptVersion, technicianName);
 
       void fetch('/api/audit-logs/pdf-export', {
         method: 'POST',

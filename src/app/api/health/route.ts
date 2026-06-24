@@ -1,5 +1,6 @@
 import { aggregateHealthStatus, runAllHealthChecks } from '@/lib/healthChecks';
 import { logger } from '@/lib/logger';
+import { PROMPT_VERSION } from '@/prompts/version';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,7 @@ export async function GET() {
   const payload = {
     status,
     version: process.env.npm_package_version || '3.0.0',
+    promptVersion: PROMPT_VERSION,
     uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000),
     timestamp: new Date().toISOString(),
     checks,

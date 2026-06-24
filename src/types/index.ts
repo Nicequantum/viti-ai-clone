@@ -265,6 +265,7 @@ export interface AuditLogEntry {
   ipAddress: string | null;
   createdAt: string;
   entryHash?: string | null;
+  promptVersion?: string | null;
 }
 
 export interface AuditChainInfo {

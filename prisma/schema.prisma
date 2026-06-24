@@ -214,11 +214,13 @@ model AuditLog {
   technician   Technician? @relation(fields: [technicianId], references: [id], onDelete: SetNull)
   dealershipId String
   dealership   Dealership  @relation(fields: [dealershipId], references: [id])
-  metadata     String      @default("{}")
-  ipAddress    String?
-  previousHash String      @default("GENESIS")
-  entryHash    String      @default("")
-  createdAt    DateTime    @default(now())
+  metadata       String      @default("{}")
+  ipAddress      String?
+  /** Merlin prompt version for AI story events; legacy for pre-migration rows; n/a for non-AI actions. */
+  promptVersion  String      @default("legacy")
+  previousHash   String      @default("GENESIS")
+  entryHash      String      @default("")
+  createdAt      DateTime    @default(now())
 
   @@index([dealershipId])
   @@index([technicianId])
