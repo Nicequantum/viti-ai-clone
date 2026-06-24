@@ -3,17 +3,14 @@ import { withAuth } from '@/lib/apiRoute';
 import { resolveServiceAdvisor } from '@/lib/advisorIntelligence';
 import { apiError, VALIDATION_ERROR } from '@/lib/errors';
 import { getRequestIp } from '@/lib/rate-limit';
-import { parseBody, resolveAdvisorSchema } from '@/lib/validation';
+import { parseRequestBody, resolveAdvisorSchema } from '@/lib/validation';
 
 export async function POST(request: Request) {
   return withAuth(
     request,
     async (session) => {
-      const body = await request.json();
-      const parsed = parseBody(resolveAdvisorSchema, body);
-      if ('error' in parsed) {
-        return apiError(VALIDATION_ERROR, 400);
-      }
+      const parsed = await parseRequestBody(request, resolveAdvisorSchema);
+      if ('error' in parsed) return parsed.error;
 
       const resolved = await resolveServiceAdvisor(
         session.dealershipId,

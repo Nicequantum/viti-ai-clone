@@ -1127,3 +1127,34 @@
     transform: rotate(360deg);
   }
 }
+
+.benz-offline-banner,
+.benz-maintenance-banner {
+  @apply flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium text-center;
+  position: sticky;
+  top: 0;
+  z-index: 60;
+}
+
+.benz-offline-banner {
+  background: var(--benz-amber-dim);
+  color: var(--benz-amber);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.benz-maintenance-banner {
+  background: var(--benz-red-dim);
+  color: var(--benz-red);
+  border-bottom: 1px solid rgba(248, 113, 113, 0.35);
+}
+
+.benz-app-footer {
+  @apply text-center py-4 mt-6 text-xs;
+  color: var(--benz-text-muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.benz-app-footer-sep {
+  @apply mx-1.5 opacity-50;
+}

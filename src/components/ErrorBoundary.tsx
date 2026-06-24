@@ -29,8 +29,11 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="app-container benz-page py-10 text-center">
           <div className="benz-card-elevated p-7">
-            <div className="text-lg font-semibold mb-2 tracking-tight">Something went wrong</div>
-            <p className="text-sm text-benz-secondary mb-5 leading-relaxed">{this.state.message}</p>
+            <div className="text-lg font-semibold mb-2 tracking-tight">Merlin hit a snag</div>
+            <p className="text-sm text-benz-secondary mb-2 leading-relaxed">
+              Something unexpected happened on this screen. Your typed notes are still on the repair order.
+            </p>
+            <p className="text-xs text-benz-muted mb-5">{this.state.message}</p>
             <button
               onClick={() => this.setState({ hasError: false, message: '' })}
               className="primary-btn px-6 h-11 text-sm touch-target"

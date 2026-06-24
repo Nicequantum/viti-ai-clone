@@ -1,4 +1,7 @@
+import type { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { apiError, VALIDATION_ERROR } from './errors';
+import { DEFAULT_JSON_BODY_LIMIT_BYTES, readBoundedJsonBody } from './requestBody';
 import { d7NumberField } from './d7Number';
 import {
   sanitizeComplaintSlots,
@@ -163,6 +166,7 @@ export const saveTemplateFromStorySchema = z.object({
 export const pdfExportAuditSchema = z.object({
   repairLineId: safeId(64),
   repairOrderId: safeId(64),
+  durationMs: z.number().int().min(0).max(600_000).optional(),
 });
 
 export const auditLogQuerySchema = z.object({
@@ -179,4 +183,19 @@ export function parseBody<T>(schema: z.ZodSchema<T>, body: unknown): { data: T }
     return { error: result.error.issues.map((i) => i.message).join('; ') };
   }
   return { data: result.data };
+}
+
+/** Bounded JSON read + Zod parse + sanitization — standard path for POST API bodies. */
+export async function parseRequestBody<T>(
+  request: Request,
+  schema: z.ZodSchema<T>,
+  maxBytes: number = DEFAULT_JSON_BODY_LIMIT_BYTES
+): Promise<{ data: T } | { error: NextResponse }> {
+  const raw = await readBoundedJsonBody(request, maxBytes);
+  if ('error' in raw) return raw;
+  const parsed = parseBody(schema, raw.body);
+  if ('error' in parsed) {
+    return { error: apiError(VALIDATION_ERROR, 400) };
+  }
+  return { data: parsed.data };
 }

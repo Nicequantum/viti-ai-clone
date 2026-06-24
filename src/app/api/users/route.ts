@@ -5,7 +5,7 @@ import { internalEmailForD7 } from '@/lib/d7Number';
 import { prisma } from '@/lib/db';
 import { apiError, VALIDATION_ERROR } from '@/lib/errors';
 import { getRequestIp } from '@/lib/rate-limit';
-import { createUserSchema, parseBody } from '@/lib/validation';
+import { createUserSchema, parseRequestBody } from '@/lib/validation';
 
 export async function GET(request: Request) {
   return withAuth(
@@ -43,11 +43,8 @@ export async function POST(request: Request) {
   return withAuth(
     request,
     async (session) => {
-      const body = await request.json();
-      const parsed = parseBody(createUserSchema, body);
-      if ('error' in parsed) {
-        return apiError(VALIDATION_ERROR, 400);
-      }
+      const parsed = await parseRequestBody(request, createUserSchema);
+      if ('error' in parsed) return parsed.error;
 
       const { d7Number, name, password, role } = parsed.data;
 

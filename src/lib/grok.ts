@@ -23,21 +23,32 @@ import {
 export { PROMPT_VERSION };
 import type { ExtractedData, RepairLine, RepairOrder } from '@/types';
 import { normalizeExtractedData, parseDiagnosticExtractionJson } from '@/utils/diagnosticParser';
+import { logPerformance } from '@/lib/perf';
 import { DIAGNOSTIC_EXTRACT_GROK_MS, RO_EXTRACT_GROK_MS } from '@/lib/timeouts';
 import { parseStructuredROText } from '@/utils/roExtractor';
 
 const GROK_API_URL = 'https://api.x.ai/v1/chat/completions';
+
+export function isGrokConfigured(): boolean {
+  try {
+    getGrokApiKey();
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function grokChat(
   messages: Array<{
     role: string;
     content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
   }>,
-  options: { temperature: number; max_tokens: number; timeoutMs?: number }
+  options: { temperature: number; max_tokens: number; timeoutMs?: number; perfLabel?: string }
 ): Promise<string> {
   const timeoutMs = options.timeoutMs ?? 55_000;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const startedAt = Date.now();
 
   try {
     const response = await fetch(GROK_API_URL, {
@@ -61,8 +72,19 @@ async function grokChat(
     }
 
     const apiResponse = await response.json();
-    return apiResponse.choices?.[0]?.message?.content?.trim() || '';
+    const content = apiResponse.choices?.[0]?.message?.content?.trim() || '';
+    logPerformance(options.perfLabel || 'grok.chat', Date.now() - startedAt, {
+      model: 'grok-3',
+      maxTokens: options.max_tokens,
+      outcome: 'ok',
+    });
+    return content;
   } catch (error) {
+    logPerformance(options.perfLabel || 'grok.chat', Date.now() - startedAt, {
+      model: 'grok-3',
+      outcome: 'error',
+      error: error instanceof Error ? error.message : 'unknown',
+    });
     if (error instanceof Error && error.name === 'AbortError') {
       throw new Error(`Grok API timed out after ${Math.round(timeoutMs / 1000)}s`);
     }
@@ -89,7 +111,7 @@ export async function generateWarrantyStory(
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userMessage },
     ],
-    { temperature: WARRANTY_STORY_TEMPERATURE, max_tokens: 1200, timeoutMs: 110_000 }
+    { temperature: WARRANTY_STORY_TEMPERATURE, max_tokens: 1200, timeoutMs: 110_000, perfLabel: 'grok.story.generate' }
   );
   return story || 'No story generated.';
 }
@@ -104,7 +126,7 @@ export async function scoreWarrantyStory(
       { role: 'system', content: STORY_SCORE_SYSTEM_PROMPT },
       { role: 'user', content: buildStoryScoreUserMessage(ro, line, warrantyStory) },
     ],
-    { temperature: 0.1, max_tokens: 900, timeoutMs: 60_000 }
+    { temperature: 0.1, max_tokens: 900, timeoutMs: 60_000, perfLabel: 'grok.story.score' }
   );
   return parseStoryQualityResponse(raw);
 }
@@ -119,7 +141,7 @@ export async function reviewWarrantyStory(
       { role: 'system', content: STORY_REVIEW_SYSTEM_PROMPT },
       { role: 'user', content: buildStoryReviewUserMessage(ro, line, warrantyStory) },
     ],
-    { temperature: 0.15, max_tokens: 1400, timeoutMs: 90_000 }
+    { temperature: 0.15, max_tokens: 1400, timeoutMs: 90_000, perfLabel: 'grok.story.review' }
   );
   return parseStoryReviewResponse(raw);
 }
@@ -135,7 +157,7 @@ export async function extractDiagnosticsFromImage(imageDataUrl: string): Promise
         ],
       },
     ],
-    { temperature: 0.05, max_tokens: 900, timeoutMs: DIAGNOSTIC_EXTRACT_GROK_MS }
+    { temperature: 0.05, max_tokens: 900, timeoutMs: DIAGNOSTIC_EXTRACT_GROK_MS, perfLabel: 'grok.diagnostics.extract' }
   );
 
   const parsed = parseDiagnosticExtractionJson(raw);
@@ -154,7 +176,7 @@ export async function extractROFromImages(imageDataUrls: string[]) {
         content: [{ type: 'text', text: RO_EXTRACTION_PROMPT }, ...imageContents],
       },
     ],
-    { temperature: 0.05, max_tokens: 1800, timeoutMs: RO_EXTRACT_GROK_MS }
+    { temperature: 0.05, max_tokens: 1800, timeoutMs: RO_EXTRACT_GROK_MS, perfLabel: 'grok.ro.extract' }
   );
   return parseStructuredROText(extractedText);
 }

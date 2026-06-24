@@ -1,5 +1,6 @@
 import { list } from '@vercel/blob';
-import { validateEnvironment } from './env';
+import { VOICE_INPUT_SETTINGS } from './constants';
+import { isMaintenanceModeEnabled, validateEnvironment } from './env';
 import { getExposedPublicGrokEnvKeys, getGrokApiKey } from './grokApiKey';
 import { encryptPII, decryptPII } from './encryption';
 import { prisma } from './db';
@@ -227,8 +228,28 @@ export async function checkKvStore(): Promise<DependencyCheck> {
   }
 }
 
+/** Voice is client-side Web Speech API — health reports config readiness, not live mic access. */
+export function checkVoiceInput(): DependencyCheck {
+  if (!VOICE_INPUT_SETTINGS.enabled) {
+    return { status: 'warn', detail: 'Voice input disabled in dealership configuration' };
+  }
+  return {
+    status: 'ok',
+    detail: `Voice enabled (${VOICE_INPUT_SETTINGS.language}, push-to-talk default: ${VOICE_INPUT_SETTINGS.pushToTalkDefault})`,
+  };
+}
+
+export function checkMaintenanceMode(): DependencyCheck {
+  if (isMaintenanceModeEnabled()) {
+    return { status: 'warn', detail: 'MERLIN_MAINTENANCE_MODE active — AI routes blocked' };
+  }
+  return { status: 'ok', detail: 'Normal operation' };
+}
+
 export async function runAllHealthChecks(): Promise<Record<string, DependencyCheck>> {
   const environment = checkEnvironmentConfig();
+  const voice = checkVoiceInput();
+  const maintenance = checkMaintenanceMode();
   const [database, encryption, session, blob, grok, kv, advisorIntelligence] = await Promise.all([
     checkDatabase(),
     checkEncryption(),
@@ -239,7 +260,7 @@ export async function runAllHealthChecks(): Promise<Record<string, DependencyChe
     checkAdvisorIntelligence(),
   ]);
 
-  return { environment, database, encryption, session, blob, grok, kv, advisorIntelligence };
+  return { environment, database, encryption, session, blob, grok, kv, voice, maintenance, advisorIntelligence };
 }
 
 export function aggregateHealthStatus(

@@ -4,7 +4,7 @@ import { hashPassword, revokeTechnicianSessions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { apiError, NOT_FOUND_ERROR, VALIDATION_ERROR } from '@/lib/errors';
 import { getRequestIp } from '@/lib/rate-limit';
-import { parseBody, resetPasswordSchema } from '@/lib/validation';
+import { parseRequestBody, resetPasswordSchema } from '@/lib/validation';
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -12,11 +12,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   return withAuth(
     request,
     async (session) => {
-      const body = await request.json();
-      const parsed = parseBody(resetPasswordSchema, body);
-      if ('error' in parsed) {
-        return apiError(VALIDATION_ERROR, 400);
-      }
+      const parsed = await parseRequestBody(request, resetPasswordSchema);
+      if ('error' in parsed) return parsed.error;
 
       const user = await prisma.technician.findFirst({
         where: { id, dealershipId: session.dealershipId },

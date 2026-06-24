@@ -3,17 +3,14 @@ import { withAuth } from '@/lib/apiRoute';
 import { apiError, VALIDATION_ERROR } from '@/lib/errors';
 import { getRequestIp } from '@/lib/rate-limit';
 import { saveTemplateFromStory } from '@/lib/saveTemplateFromStory';
-import { parseBody, saveTemplateFromStorySchema } from '@/lib/validation';
+import { parseRequestBody, saveTemplateFromStorySchema } from '@/lib/validation';
 
 export async function POST(request: Request) {
   return withAuth(
     request,
     async (session) => {
-      const body = await request.json();
-      const parsed = parseBody(saveTemplateFromStorySchema, body);
-      if ('error' in parsed) {
-        return apiError(VALIDATION_ERROR, 400);
-      }
+      const parsed = await parseRequestBody(request, saveTemplateFromStorySchema);
+      if ('error' in parsed) return parsed.error;
 
       const data = parsed.data;
       if (!data.finalText.trim()) {

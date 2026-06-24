@@ -89,7 +89,10 @@ flowchart LR
 | **Session security** | JWT with server-side revocation on password change, deactivation, or logout |
 | **Image access** | Private Vercel Blob storage; session-gated `/api/images` proxy |
 | **AI safety** | Prompts use `[NOT DOCUMENTED]` / `[NOT PROVIDED]` — no fabricated test data |
-| **Rate limiting** | Distributed via Vercel KV in production |
+| **Rate limiting** | Per-IP limits on all routes; Grok routes capped at 20/min + 50 AI calls/technician/day |
+| **CSP & headers** | Content-Security-Policy, HSTS, frame denial, microphone policy for shop-floor voice |
+| **Request limits** | Bounded JSON bodies (1–2 MB) with Zod validation and sanitization on all POST routes |
+| **Maintenance mode** | `MERLIN_MAINTENANCE_MODE=true` blocks AI routes with technician-friendly banner |
 
 > **Production requirement:** A signed Data Processing Agreement with xAI is required before processing real customer or vehicle data.
 
@@ -184,25 +187,56 @@ Open [http://localhost:3000](http://localhost:3000) after configuring environmen
 | `GROK_API_KEY` | For AI | xAI API key (server-side only) |
 | `BLOB_READ_WRITE_TOKEN` | For uploads | Private diagnostic image storage |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Production | Distributed rate limiting |
+| `MERLIN_MAINTENANCE_MODE` | Optional | `true` pauses AI routes during maintenance |
 | `ADMIN_SEED_PASSWORD` | For seed | Initial manager password — never commit |
+
+Build-time validation runs automatically via `npm run validate:env` (also part of `npm run build`).
 
 ### Production (Vercel + PostgreSQL)
 
 1. Connect repo, deploy branch `main`
-2. Set all variables from `.env.example`
-3. Run `npm run db:migrate:deploy` (included in `npm run build`)
+2. Set all variables from `.env.example` in Vercel project settings
+3. Confirm `npm run build` succeeds (runs env validation + `prisma migrate deploy`)
 4. Run `npm run db:reencrypt` if upgrading an existing database
-5. Verify `GET /api/health` returns `"status": "ok"`
+5. Verify health and status endpoints:
+
+```bash
+curl -s https://your-dealership-url/api/health | jq '.status, .services'
+curl -s https://your-dealership-url/api/status | jq '.version, .buildCommit, .maintenance'
+```
+
+6. Confirm UI footer shows version, commit hash, and build date on a signed-in tablet
 
 ### Pre-production checklist
 
-- [ ] Environment variables configured on host
-- [ ] Database migrations applied without errors
+**Infrastructure**
+- [ ] `DATABASE_URL`, `SESSION_SECRET`, `ENCRYPTION_KEY` set and validated (`npm run validate:env`)
+- [ ] `GROK_API_KEY` configured server-side (no `NEXT_PUBLIC_*` xAI keys)
+- [ ] `KV_REST_API_URL` + `KV_REST_API_TOKEN` set for distributed rate limiting
+- [ ] `BLOB_READ_WRITE_TOKEN` set for diagnostic image uploads
+- [ ] Database migrations applied without errors (`npm run db:migrate:deploy`)
 - [ ] Legacy data re-encrypted (`npm run db:reencrypt`) if upgrading
+
+**Security & compliance**
 - [ ] Seed/default passwords rotated via Settings
 - [ ] Audit log hash-chain integrity shows **VALID**
-- [ ] xAI DPA executed
-- [ ] CI passing on `main`
+- [ ] xAI Data Processing Agreement executed
+- [ ] CSP/security headers verified (no console CSP violations on login + line view)
+- [ ] Microphone permission tested on shop-floor tablet (Chrome/Edge)
+
+**Operational readiness**
+- [ ] `GET /api/health` returns `"status": "ok"` or acceptable `"degraded"` with documented warnings
+- [ ] `services.database`, `services.grok`, `services.voice` reported in health payload
+- [ ] Story generation + PDF export tested end-to-end on tablet viewport
+- [ ] Offline banner appears when Wi‑Fi disabled; manual typing still works
+- [ ] `MERLIN_MAINTENANCE_MODE` tested — banner shows, AI routes return 503
+- [ ] CI unit tests passing on `main` (`npm test`)
+- [ ] Error boundary tested (force a client error — recovery UI appears)
+
+**Rollout**
+- [ ] Service manager briefed on audit log and usage dashboard
+- [ ] Technicians briefed on voice push-to-talk and manual fallback
+- [ ] IT contact documented for health endpoint monitoring
 
 ---
 

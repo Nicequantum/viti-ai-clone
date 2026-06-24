@@ -1,6 +1,9 @@
 'use client';
 
+import { AppFooter } from '@/components/AppFooter';
 import { AppHeader } from '@/components/AppHeader';
+import { MaintenanceBanner } from '@/components/MaintenanceBanner';
+import { OfflineBanner } from '@/components/OfflineBanner';
 import { ConsentModal } from '@/components/ConsentModal';
 import { HomeView } from '@/components/HomeView';
 import { LineView } from '@/components/LineView';
@@ -84,6 +87,8 @@ export function BenzTechApp() {
 
   return (
     <div className={`app-container${wideLayout ? ' benz-app-wide' : ''}`}>
+      <OfflineBanner />
+      <MaintenanceBanner />
       <LoadingOverlay
         visible={!!ro.openingROId}
         message={openingRoNumber ? `Loading ${openingRoNumber}…` : 'Loading repair order…'}
@@ -203,6 +208,8 @@ export function BenzTechApp() {
       {ro.view === 'advisors' && isManager && (
         <ServiceAdvisorsView onBack={() => ro.setView('home')} />
       )}
+
+      <AppFooter />
     </div>
   );
 }

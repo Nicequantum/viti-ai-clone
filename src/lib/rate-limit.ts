@@ -16,7 +16,9 @@ export interface RateLimitConfig {
 export const RATE_LIMITS = {
   auth: { limit: 10, windowMs: 60_000 },
   upload: { limit: 30, windowMs: 60_000 },
+  /** All Grok-backed routes (story, review, RO/diagnostic extract) share this ceiling. */
   generate: { limit: 20, windowMs: 60_000 },
+  grok: { limit: 20, windowMs: 60_000 },
   default: { limit: 60, windowMs: 60_000 },
 } as const;
 

@@ -4,7 +4,8 @@
   "version": "3.0.1",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && next build",
+    "validate:env": "node scripts/validate-env.mjs",
+    "build": "node scripts/validate-env.mjs && prisma generate && prisma migrate deploy && next build",
     "start": "next start",
     "lint": "next lint",
     "db:migrate": "prisma migrate dev",

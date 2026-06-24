@@ -15,7 +15,8 @@ import {
 import { collectRepairOrderImagePathnames, findForbiddenImagePathname } from '@/lib/imageAccess';
 import { apiError, FORBIDDEN_ERROR, VALIDATION_ERROR } from '@/lib/errors';
 import { getRequestIp } from '@/lib/rate-limit';
-import { createRepairOrderSchema, parseBody } from '@/lib/validation';
+import { LARGE_JSON_BODY_LIMIT_BYTES } from '@/lib/requestBody';
+import { createRepairOrderSchema, parseRequestBody } from '@/lib/validation';
 import { emptyExtractedData } from '@/utils/diagnosticParser';
 import { createRepairOrderFromScan } from '@/utils/repairOrderFactory';
 
@@ -54,11 +55,8 @@ export async function POST(request: Request) {
   return withAuth(
     request,
     async (session) => {
-      const body = await request.json();
-      const parsed = parseBody(createRepairOrderSchema, body);
-      if ('error' in parsed) {
-        return apiError(VALIDATION_ERROR, 400);
-      }
+      const parsed = await parseRequestBody(request, createRepairOrderSchema, LARGE_JSON_BODY_LIMIT_BYTES);
+      if ('error' in parsed) return parsed.error;
 
       const data = parsed.data;
       let input: RepairOrderInput;

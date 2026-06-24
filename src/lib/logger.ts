@@ -14,7 +14,7 @@ function write(level: LogLevel, message: string, context?: LogContext): void {
     ts: new Date().toISOString(),
     level,
     msg: message,
-    service: 'benz-tech',
+    service: 'merlin',
     ...serializeContext(context),
   };
 

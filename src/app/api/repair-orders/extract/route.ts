@@ -1,10 +1,12 @@
 import { fetchPrivateBlobAsDataUrl } from '@/lib/blob';
 import { withAuth } from '@/lib/apiRoute';
 import { extractROFromImages } from '@/lib/grok';
-import { apiError, FORBIDDEN_ERROR, VALIDATION_ERROR } from '@/lib/errors';
+import { apiError, FORBIDDEN_ERROR } from '@/lib/errors';
+import { mapGrokRouteError } from '@/lib/grokErrors';
 import { userCanAccessImage } from '@/lib/imageAccess';
 import { extractPathnameFromImageRef, isAllowedImagePathname } from '@/lib/imageUrls';
-import { imagePathnamesSchema, parseBody } from '@/lib/validation';
+import { RATE_LIMITS } from '@/lib/rate-limit';
+import { imagePathnamesSchema, parseRequestBody } from '@/lib/validation';
 
 /** Must match RO_EXTRACT_ROUTE_MAX_DURATION_S in @/lib/timeouts */
 export const maxDuration = 130;
@@ -13,11 +15,8 @@ export async function POST(request: Request) {
   return withAuth(
     request,
     async (session) => {
-      const body = await request.json();
-      const parsed = parseBody(imagePathnamesSchema, body);
-      if ('error' in parsed) {
-        return apiError(VALIDATION_ERROR, 400);
-      }
+      const parsed = await parseRequestBody(request, imagePathnamesSchema);
+      if ('error' in parsed) return parsed.error;
 
       const pathnames = parsed.data.imagePathnames.map((ref) => extractPathnameFromImageRef(ref) || ref);
 
@@ -32,9 +31,20 @@ export async function POST(request: Request) {
       }
 
       const imageDataUrls = await Promise.all(pathnames.map((pathname) => fetchPrivateBlobAsDataUrl(pathname)));
-      const extracted = await extractROFromImages(imageDataUrls);
-      return extracted;
+      try {
+        const extracted = await extractROFromImages(imageDataUrls);
+        return extracted;
+      } catch (error) {
+        const mapped = mapGrokRouteError(error, 'Repair order scan');
+        return apiError(mapped.message, mapped.status);
+      }
     },
-    { rateLimitKey: 'ro.extract', rateLimit: { limit: 15, windowMs: 60_000 }, trackUsage: true }
+    {
+      rateLimitKey: 'ro.extract',
+      rateLimit: RATE_LIMITS.generate,
+      trackUsage: true,
+      blockInMaintenance: true,
+      perfEvent: 'route.ro.extract',
+    }
   );
 }

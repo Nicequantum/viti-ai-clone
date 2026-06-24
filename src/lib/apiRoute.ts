@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSession } from './auth';
+import { isMaintenanceModeEnabled } from './env';
 import {
   apiError,
   CONSENT_REQUIRED_ERROR,
@@ -7,8 +8,10 @@ import {
   FORBIDDEN_ERROR,
   GENERIC_ERROR,
   handleRouteError,
+  MAINTENANCE_MODE_ERROR,
   UNAUTHORIZED_ERROR,
 } from './errors';
+import { logPerformance } from './perf';
 import { checkRateLimit, RATE_LIMITS, type RateLimitConfig } from './rate-limit';
 import { isDailyUsageLimitReached, logApiUsage } from './usageMonitoring';
 
@@ -23,6 +26,10 @@ interface RouteOptions {
   trackUsage?: boolean;
   /** When true, allow the route before privacy consent is recorded (e.g. POST /api/consent). */
   skipConsent?: boolean;
+  /** Block when MERLIN_MAINTENANCE_MODE is enabled (AI and heavy write paths). */
+  blockInMaintenance?: boolean;
+  /** Emit structured perf log for the route handler duration. */
+  perfEvent?: string;
 }
 
 export async function withAuth<T>(
@@ -30,10 +37,16 @@ export async function withAuth<T>(
   handler: (session: Session) => Promise<T>,
   options: RouteOptions = {}
 ): Promise<NextResponse | Response> {
+  const routeKey = options.rateLimitKey || 'api';
+
+  if (options.blockInMaintenance && isMaintenanceModeEnabled()) {
+    return apiError(MAINTENANCE_MODE_ERROR, 503);
+  }
+
   const rateLimited = await checkRateLimit(
     request,
-    options.rateLimitKey || 'api',
-    options.rateLimit || RATE_LIMITS.default
+    routeKey,
+    options.rateLimit || (options.trackUsage ? RATE_LIMITS.generate : RATE_LIMITS.default)
   );
   if (rateLimited) return rateLimited;
 
@@ -54,8 +67,6 @@ export async function withAuth<T>(
     return apiError(CONSENT_REQUIRED_ERROR, 403);
   }
 
-  const usageRouteKey = options.rateLimitKey || 'api';
-
   if (options.trackUsage) {
     const limitReached = await isDailyUsageLimitReached(session.technicianId);
     if (limitReached) {
@@ -63,6 +74,7 @@ export async function withAuth<T>(
     }
   }
 
+  const startedAt = Date.now();
   try {
     const result = await handler(session);
     const isSuccessResponse =
@@ -72,7 +84,15 @@ export async function withAuth<T>(
       await logApiUsage({
         technicianId: session.technicianId,
         dealershipId: session.dealershipId,
-        routeKey: usageRouteKey,
+        routeKey: routeKey,
+      });
+    }
+    if (options.perfEvent) {
+      logPerformance(options.perfEvent, Date.now() - startedAt, {
+        routeKey,
+        technicianId: session.technicianId,
+        dealershipId: session.dealershipId,
+        status: result instanceof NextResponse || result instanceof Response ? result.status : 200,
       });
     }
     if (result instanceof NextResponse || result instanceof Response) {
@@ -80,7 +100,14 @@ export async function withAuth<T>(
     }
     return NextResponse.json(result);
   } catch (error) {
-    return handleRouteError(error, options.rateLimitKey || 'api');
+    if (options.perfEvent) {
+      logPerformance(options.perfEvent, Date.now() - startedAt, {
+        routeKey,
+        technicianId: session.technicianId,
+        failed: true,
+      });
+    }
+    return handleRouteError(error, routeKey);
   }
 }
 
@@ -89,21 +116,34 @@ export async function withPublicRoute<T>(
   handler: () => Promise<T>,
   options: RouteOptions = {}
 ): Promise<NextResponse | Response> {
+  const routeKey = options.rateLimitKey || 'public';
+
+  if (options.blockInMaintenance && isMaintenanceModeEnabled()) {
+    return apiError(MAINTENANCE_MODE_ERROR, 503);
+  }
+
   const rateLimited = await checkRateLimit(
     request,
-    options.rateLimitKey || 'public',
+    routeKey,
     options.rateLimit || RATE_LIMITS.default
   );
   if (rateLimited) return rateLimited;
 
+  const startedAt = Date.now();
   try {
     const result = await handler();
+    if (options.perfEvent) {
+      logPerformance(options.perfEvent, Date.now() - startedAt, { routeKey });
+    }
     if (result instanceof NextResponse || result instanceof Response) {
       return result;
     }
     return NextResponse.json(result);
   } catch (error) {
-    return handleRouteError(error, options.rateLimitKey || 'public');
+    if (options.perfEvent) {
+      logPerformance(options.perfEvent, Date.now() - startedAt, { routeKey, failed: true });
+    }
+    return handleRouteError(error, routeKey);
   }
 }
 

@@ -9,7 +9,8 @@ import { prisma } from '@/lib/db';
 import { dbToRepairOrder, normalizeImageAttachments, repairLineToDbFields, repairOrderToDbFields } from '@/lib/roMapper';
 import { apiError, NOT_FOUND_ERROR, VALIDATION_ERROR } from '@/lib/errors';
 import { getRequestIp } from '@/lib/rate-limit';
-import { parseBody, updateRepairOrderSchema } from '@/lib/validation';
+import { LARGE_JSON_BODY_LIMIT_BYTES } from '@/lib/requestBody';
+import { parseRequestBody, updateRepairOrderSchema } from '@/lib/validation';
 import { emptyExtractedData } from '@/utils/diagnosticParser';
 
 async function canAccess(session: { technicianId: string; role: string; dealershipId: string }, roId: string) {
@@ -50,11 +51,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       const existing = await canAccess(session, id);
       if (!existing) return apiError(NOT_FOUND_ERROR, 404);
 
-      const body = await request.json();
-      const parsed = parseBody(updateRepairOrderSchema, body);
-      if ('error' in parsed) {
-        return apiError(VALIDATION_ERROR, 400);
-      }
+      const parsed = await parseRequestBody(request, updateRepairOrderSchema, LARGE_JSON_BODY_LIMIT_BYTES);
+      if ('error' in parsed) return parsed.error;
 
       const data = parsed.data;
       const existingMapped = dbToRepairOrder(existing);

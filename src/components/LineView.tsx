@@ -143,13 +143,15 @@ export function LineView({
         console.warn('Could not fetch audit hash for PDF:', err);
       }
 
+      const pdfStartedAt = performance.now();
       exportWarrantyStoryPdf(ro, line, storyText, auditHash, promptVersion, technicianName);
+      const durationMs = Math.round(performance.now() - pdfStartedAt);
 
       void fetch('/api/audit-logs/pdf-export', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repairLineId: line.id, repairOrderId: ro.id }),
+        body: JSON.stringify({ repairLineId: line.id, repairOrderId: ro.id, durationMs }),
       }).catch((err) => {
         console.warn('Could not record PDF export audit log:', err);
       });

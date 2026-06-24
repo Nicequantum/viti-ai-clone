@@ -4,17 +4,14 @@ import { clearSessionCookie, hashPassword, revokeTechnicianSessions, verifyPassw
 import { prisma } from '@/lib/db';
 import { apiError, VALIDATION_ERROR } from '@/lib/errors';
 import { getRequestIp } from '@/lib/rate-limit';
-import { changePasswordSchema, parseBody } from '@/lib/validation';
+import { changePasswordSchema, parseRequestBody } from '@/lib/validation';
 
 export async function POST(request: Request) {
   return withAuth(
     request,
     async (session) => {
-      const body = await request.json();
-      const parsed = parseBody(changePasswordSchema, body);
-      if ('error' in parsed) {
-        return apiError(VALIDATION_ERROR, 400);
-      }
+      const parsed = await parseRequestBody(request, changePasswordSchema);
+      if ('error' in parsed) return parsed.error;
 
       const tech = await prisma.technician.findUnique({ where: { id: session.technicianId } });
       if (!tech) {

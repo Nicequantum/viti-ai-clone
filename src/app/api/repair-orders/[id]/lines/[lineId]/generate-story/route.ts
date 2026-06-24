@@ -17,6 +17,7 @@ import {
 import { encryptOptionalSensitiveText } from '@/lib/encryption';
 import { dbToRepairOrder } from '@/lib/roMapper';
 import { apiError, NOT_FOUND_ERROR } from '@/lib/errors';
+import { mapGrokRouteError } from '@/lib/grokErrors';
 import { getRequestIp, RATE_LIMITS } from '@/lib/rate-limit';
 
 export async function POST(
@@ -93,14 +94,8 @@ export async function POST(
           knowledgeBaseContext
         );
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Story generation failed';
-        if (message.includes('GROK_API_KEY')) {
-          return apiError('Story generation is not configured. Contact your administrator.', 503);
-        }
-        if (message.toLowerCase().includes('timed out')) {
-          return apiError('Story generation timed out — try again in a moment.', 504);
-        }
-        return apiError('Story generation failed — try again in a moment.', 502);
+        const mapped = mapGrokRouteError(error, 'Story generation');
+        return apiError(mapped.message, mapped.status);
       }
 
       await prisma.repairLine.update({
@@ -138,6 +133,12 @@ export async function POST(
 
       return { warrantyStory, quality };
     },
-    { rateLimitKey: 'story.generate', rateLimit: RATE_LIMITS.generate, trackUsage: true }
+    {
+      rateLimitKey: 'story.generate',
+      rateLimit: RATE_LIMITS.generate,
+      trackUsage: true,
+      blockInMaintenance: true,
+      perfEvent: 'route.story.generate',
+    }
   );
 }

@@ -3,9 +3,17 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+function resolveBuildCommit() {
+  return process.env.VERCEL_GIT_COMMIT_SHA || process.env.GIT_COMMIT || process.env.NEXT_PUBLIC_BUILD_COMMIT || 'dev';
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  env: {
+    NEXT_PUBLIC_BUILD_COMMIT: resolveBuildCommit(),
+    NEXT_PUBLIC_BUILD_DATE: process.env.NEXT_PUBLIC_BUILD_DATE || new Date().toISOString(),
+  },
   serverExternalPackages: ['pdfjs-dist', '@napi-rs/canvas'],
   webpack: (config) => {
     config.resolve.alias = {
@@ -27,12 +35,15 @@ const nextConfig = {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self'",
-      "connect-src 'self'",
-      "worker-src 'self' blob:",
+      // Self API + xAI (server uses fetch without CSP) + Google Speech (Web Speech API on tablets)
+      "connect-src 'self' https://api.x.ai https://*.google.com https://*.gstatic.com wss://*.google.com",
+      "worker-src 'self' blob: https://cdn.jsdelivr.net",
       "child-src 'self' blob:",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
+      "object-src 'none'",
+      "upgrade-insecure-requests",
     ].join('; ');
 
     return [
@@ -44,7 +55,7 @@ const nextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=()' },
+          { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=()' },
           { key: 'X-DNS-Prefetch-Control', value: 'off' },
         ],
       },

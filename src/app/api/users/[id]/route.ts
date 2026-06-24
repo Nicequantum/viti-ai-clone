@@ -4,7 +4,7 @@ import { revokeTechnicianSessions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { apiError, FORBIDDEN_ERROR, NOT_FOUND_ERROR, VALIDATION_ERROR } from '@/lib/errors';
 import { getRequestIp } from '@/lib/rate-limit';
-import { parseBody, updateUserSchema } from '@/lib/validation';
+import { parseRequestBody, updateUserSchema } from '@/lib/validation';
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -12,11 +12,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   return withAuth(
     request,
     async (session) => {
-      const body = await request.json();
-      const parsed = parseBody(updateUserSchema, body);
-      if ('error' in parsed) {
-        return apiError(VALIDATION_ERROR, 400);
-      }
+      const parsed = await parseRequestBody(request, updateUserSchema);
+      if ('error' in parsed) return parsed.error;
 
       if (id === session.technicianId && !parsed.data.isActive) {
         return apiError('You cannot deactivate your own account.', 400);

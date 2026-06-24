@@ -1,17 +1,14 @@
 import { withAuth } from '@/lib/apiRoute';
-import { apiError, VALIDATION_ERROR } from '@/lib/errors';
+import { apiError } from '@/lib/errors';
 import { decodeVin } from '@/lib/vin';
-import { parseBody, vinSchema } from '@/lib/validation';
+import { parseRequestBody, vinSchema } from '@/lib/validation';
 
 export async function POST(request: Request) {
   return withAuth(
     request,
     async () => {
-      const body = await request.json();
-      const parsed = parseBody(vinSchema, body);
-      if ('error' in parsed) {
-        return apiError(VALIDATION_ERROR, 400);
-      }
+      const parsed = await parseRequestBody(request, vinSchema);
+      if ('error' in parsed) return parsed.error;
 
       const result = await decodeVin(parsed.data.vin);
       return result;

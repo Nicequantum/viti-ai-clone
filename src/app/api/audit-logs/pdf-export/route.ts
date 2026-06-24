@@ -2,27 +2,19 @@ import { writeAuditLog } from '@/lib/audit';
 import { PROMPT_VERSION } from '@/prompts/version';
 import { withAuth } from '@/lib/apiRoute';
 import { prisma } from '@/lib/db';
-import { apiError, VALIDATION_ERROR } from '@/lib/errors';
+import { apiError } from '@/lib/errors';
 import { getRequestIp } from '@/lib/rate-limit';
-import { parseBody, pdfExportAuditSchema } from '@/lib/validation';
+import { logPerformance } from '@/lib/perf';
+import { parseRequestBody, pdfExportAuditSchema } from '@/lib/validation';
 
 export async function POST(request: Request) {
   return withAuth(
     request,
     async (session) => {
-      let body: unknown;
-      try {
-        body = await request.json();
-      } catch {
-        return apiError(VALIDATION_ERROR, 400);
-      }
+      const parsed = await parseRequestBody(request, pdfExportAuditSchema);
+      if ('error' in parsed) return parsed.error;
 
-      const parsed = parseBody(pdfExportAuditSchema, body);
-      if ('error' in parsed) {
-        return apiError(VALIDATION_ERROR, 400);
-      }
-
-      const { repairLineId, repairOrderId } = parsed.data;
+      const { repairLineId, repairOrderId, durationMs } = parsed.data;
 
       const line = await prisma.repairLine.findFirst({
         where: {
@@ -52,8 +44,16 @@ export async function POST(request: Request) {
         ipAddress: getRequestIp(request),
       });
 
+      if (durationMs != null) {
+        logPerformance('client.pdf.export', durationMs, {
+          repairLineId,
+          repairOrderId,
+          technicianId: session.technicianId,
+        });
+      }
+
       return { ok: true };
     },
-    { rateLimitKey: 'audit-logs.pdf-export' }
+    { rateLimitKey: 'audit-logs.pdf-export', perfEvent: 'route.pdf.export.audit' }
   );
 }
