@@ -4,6 +4,8 @@
 **Time to read:** 5 minutes  
 **Version:** 3.0.1
 
+> **Shop-floor cheat sheet:** Print and laminate the [Bay Reference Card](./Bay-Reference-Card.md) — keep it next to your tablet for voice modes and quick fixes.
+
 ---
 
 Merlin helps you turn your repair notes into professional warranty stories — fast. **Voice input** is built for greasy hands and noisy bays. **AI story generation** turns your documented findings into MI 2.0–ready narratives you can paste into CDK or export as a PDF.

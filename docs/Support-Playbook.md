@@ -249,7 +249,9 @@ See [Admin Setup Guide](./Admin-Setup-Guide.md) for environment variables and mo
 
 ## Printable quick reference card
 
-**Cut along dashed line — post at each bay tablet**
+**Preferred:** Use the full double-sided [Bay Reference Card](./Bay-Reference-Card.md) (front + back, laminated).
+
+**Cut along dashed line — post at each bay tablet** *(minimal fallback)*
 
 ```
 ─────────────────────────────────────────

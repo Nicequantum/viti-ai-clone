@@ -196,7 +196,8 @@ Final deliverable package for launching Merlin to production at Mercedes-Benz de
 | 4 | [**Go-Live Checklist**](./docs/Go-Live-Checklist.md) | IT, SM, FO | Final go/no-go review **24–48 hours before launch** |
 | 5 | [**Training Outline**](./docs/Training-Outline.md) | Trainer, Lead Technician | 30–45 min hands-on session on deployment day |
 | 6 | [**Go-Live Email Template**](./docs/Go-Live-Email-Template.md) | Service Manager | Announce launch and training to the service team |
-| 7 | [**Technician Quick Start**](./docs/Technician-Quick-Start.md) | Technicians | Print at every bay tablet — daily reference |
+| 7 | [**Technician Quick Start**](./docs/Technician-Quick-Start.md) | Technicians | Full daily reference guide |
+| 7b | [**Bay Reference Card**](./docs/Bay-Reference-Card.md) | Technicians | **Laminate at every bay tablet** — double-sided cheat sheet |
 | 8 | [**Support Playbook**](./docs/Support-Playbook.md) | IT, Service Manager | Post-launch troubleshooting and escalation |
 
 **Go-live week at a glance:**
