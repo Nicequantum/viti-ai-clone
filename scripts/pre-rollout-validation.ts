@@ -661,6 +661,108 @@ async function checkCoreFeatures(): Promise<void> {
   }
 }
 
+const REQUIRED_ROLLOUT_DOCS = [
+  'Master-Rollout-Document.md',
+  'Technician-Quick-Start.md',
+  'Bay-Reference-Card.md',
+  'Bay-Reference-Card-Front.md',
+  'Bay-Reference-Card-Back.md',
+  'Admin-Setup-Guide.md',
+  'Rollout-Checklist.md',
+  'Training-Outline.md',
+  'Go-Live-Checklist.md',
+  'Go-Live-Email-Template.md',
+  'Go-Live-Summary.md',
+  'Support-Playbook.md',
+];
+
+const RECOMMENDED_DOC_IMAGES = [
+  'technician-login-ro-list.png',
+  'technician-voice-modes.png',
+  'technician-voice-panel.png',
+  'technician-notes-voice.png',
+  'technician-generate-story.png',
+  'technician-story-actions.png',
+];
+
+async function checkDocumentation(): Promise<void> {
+  section('Rollout Documentation');
+
+  const docsDir = resolve(process.cwd(), 'docs');
+  const missingDocs = REQUIRED_ROLLOUT_DOCS.filter((name) => !existsSync(resolve(docsDir, name)));
+
+  if (missingDocs.length === 0) {
+    record(
+      'Documentation',
+      'Required rollout documents',
+      'pass',
+      `${REQUIRED_ROLLOUT_DOCS.length} files present in docs/`
+    );
+  } else {
+    record(
+      'Documentation',
+      'Required rollout documents',
+      'fail',
+      `Missing: ${missingDocs.join(', ')}`
+    );
+  }
+
+  const readmePath = resolve(process.cwd(), 'README.md');
+  if (existsSync(readmePath)) {
+    const readme = readFileSync(readmePath, 'utf8');
+    const linksMaster = readme.includes('Master-Rollout-Document.md');
+    const linksBayCard = readme.includes('Bay-Reference-Card.md');
+    if (linksMaster && linksBayCard) {
+      record(
+        'Documentation',
+        'README documentation index',
+        'pass',
+        'README links Master Rollout Document and Bay Reference Card'
+      );
+    } else {
+      record(
+        'Documentation',
+        'README documentation index',
+        'fail',
+        'README missing links to key rollout documents'
+      );
+    }
+  } else {
+    record('Documentation', 'README documentation index', 'fail', 'README.md not found');
+  }
+
+  const imagesDir = resolve(docsDir, 'images');
+  if (!existsSync(imagesDir)) {
+    record(
+      'Documentation',
+      'Technician guide screenshots',
+      'warn',
+      'docs/images/ not found — add screenshots before printing Technician Quick Start',
+      false
+    );
+  } else {
+    const missingImages = RECOMMENDED_DOC_IMAGES.filter(
+      (name) => !existsSync(resolve(imagesDir, name))
+    );
+    if (missingImages.length === 0) {
+      record(
+        'Documentation',
+        'Technician guide screenshots',
+        'pass',
+        `All ${RECOMMENDED_DOC_IMAGES.length} recommended images present`
+      );
+    } else {
+      record(
+        'Documentation',
+        'Technician guide screenshots',
+        'warn',
+        `Missing ${missingImages.length}/${RECOMMENDED_DOC_IMAGES.length} images — OK for launch; add before print distribution`,
+        false
+      );
+    }
+  }
+}
+
 async function checkSecurityAndConfig(): Promise<void> {
   section('Security & Configuration');
 
@@ -818,6 +920,7 @@ async function main(): Promise<void> {
   await checkEnvironment();
   await checkCoreSystems();
   await checkCoreFeatures();
+  await checkDocumentation();
   await checkSecurityAndConfig();
 
   printSummary();

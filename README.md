@@ -9,6 +9,70 @@
 
 Merlin is a secure, dealership-specific platform that allows Mercedes-Benz technicians to create accurate, professional warranty narratives using Grok AI. It combines voice input, enterprise-grade security, and a complete audit trail to meet the standards of both individual dealerships and multi-location groups.
 
+**Version:** 3.0.1 · **Prompt version:** 2.1.0 · **Status:** Production-ready for multi-dealership rollout
+
+---
+
+## Production Readiness Status
+
+| Area | Status | Notes |
+|------|--------|-------|
+| **Audit trail** | ✅ Ready | SHA-256 hash chain + `promptVersion` on every AI entry |
+| **Voice input** | ✅ Ready | Noise monitoring, push-to-talk, auto-restart, adaptive confidence |
+| **AI story generation** | ✅ Ready | Centralized prompts v2.1.0, rate limits, daily caps |
+| **PDF export** | ✅ Ready | Branded headers, structured content, audit hash in footer |
+| **Security** | ✅ Ready | AES-256-GCM PII, CSP headers, route auth, input sanitization |
+| **Operations** | ✅ Ready | Maintenance mode, offline banner, health/status endpoints, error boundaries |
+| **Validation** | ✅ Ready | `npm run validate:env` + `npm run validate:pre-rollout` |
+| **Documentation** | ✅ Ready | 12 rollout documents in [`docs/`](./docs/) — [full index](./docs/README.md) |
+| **Dealership config** | ⚠️ Per site | Set `DEALERSHIP_DISPLAY_NAME`, secrets, and doc placeholders before go-live |
+| **Screenshots** | ⚠️ Optional | Add `docs/images/*.png` before printing Technician Quick Start |
+| **KV rate limiting** | ⚠️ Recommended | Configure `KV_REST_*` for distributed limits in serverless |
+
+**Go-live gate:** `npm run validate:pre-rollout` with **0 critical failures** + [Go-Live Checklist](./docs/Go-Live-Checklist.md) signed off.
+
+---
+
+## Documentation — start here
+
+> **Dealership leadership:** Start with the [**Master Rollout Document**](./docs/Master-Rollout-Document.md) — readable in under 10 minutes.
+
+All rollout and go-live materials live in [`docs/`](./docs/). See the [**Documentation Library index**](./docs/README.md) for role-based navigation.
+
+### By audience
+
+| Audience | Primary document |
+|----------|------------------|
+| **GM / Fixed Ops Director** | [**Master Rollout Document**](./docs/Master-Rollout-Document.md) |
+| **Service Manager** | [Master Rollout Document](./docs/Master-Rollout-Document.md) → [Rollout Checklist](./docs/Rollout-Checklist.md) |
+| **Dealership IT** | [Admin Setup Guide](./docs/Admin-Setup-Guide.md) |
+| **Trainer** | [Training Outline](./docs/Training-Outline.md) |
+| **Technician** | [Bay Reference Card](./docs/Bay-Reference-Card.md) (laminate) + [Quick Start](./docs/Technician-Quick-Start.md) |
+
+### Complete document library
+
+| # | Document | Audience |
+|---|----------|----------|
+| 1 | [Master Rollout Document](./docs/Master-Rollout-Document.md) | Leadership |
+| 2 | [Go-Live Summary](./docs/Go-Live-Summary.md) | GM, Fixed Ops |
+| 3 | [Admin Setup Guide](./docs/Admin-Setup-Guide.md) | IT, Service Manager |
+| 4 | [Rollout Checklist](./docs/Rollout-Checklist.md) | All rollout roles |
+| 5 | [Go-Live Checklist](./docs/Go-Live-Checklist.md) | IT, SM, FO — final go/no-go |
+| 6 | [Training Outline](./docs/Training-Outline.md) | Trainers |
+| 7 | [Go-Live Email Template](./docs/Go-Live-Email-Template.md) | Service Manager |
+| 8 | [Technician Quick Start](./docs/Technician-Quick-Start.md) | Technicians |
+| 9 | [Bay Reference Card](./docs/Bay-Reference-Card.md) (+ [Front](./docs/Bay-Reference-Card-Front.md) / [Back](./docs/Bay-Reference-Card-Back.md)) | Technicians — laminate |
+| 10 | [Support Playbook](./docs/Support-Playbook.md) | IT, Service Manager |
+
+### Rollout sequence
+
+1. Leadership approves via [Master Rollout Document](./docs/Master-Rollout-Document.md)
+2. IT provisions per [Admin Setup Guide](./docs/Admin-Setup-Guide.md) → passes `npm run validate:pre-rollout`
+3. Service manager completes [Rollout Checklist](./docs/Rollout-Checklist.md) Phase 1
+4. Final [Go-Live Checklist](./docs/Go-Live-Checklist.md) 24–48 hours before launch
+5. Go-live: training + [Bay Reference Cards](./docs/Bay-Reference-Card.md) at every tablet
+6. Post-launch: [Support Playbook](./docs/Support-Playbook.md) + 30/60/90-day metrics from Master doc
+
 ---
 
 ## Who This Is For
@@ -159,61 +223,6 @@ StableTextarea / StableInput
 | **PDF Generation Failed** | "Failed to generate PDF" | Complete all required fields first, then regenerate |
 | **Frequent Logouts** | Unexpected session expiry | Verify device clock; clear browser cache |
 | **Audit Chain Warning** | Integrity error in audit log | Stop use; notify Service Manager and IT immediately |
-
----
-
-## Dealership Rollout
-
-> **Start here — dealership leadership:** [**Master Rollout Document**](./docs/Master-Rollout-Document.md) — the single authoritative overview for Fixed Ops Directors, Service Managers, and General Managers. Readable in under 10 minutes; covers business case, timeline, go-live gates, and success metrics.
-
-Professional onboarding package for Fixed Ops rollout across multiple Mercedes-Benz dealerships. Send the master document to executives first; use the supporting library below for execution.
-
-| Document | Audience | Purpose |
-|----------|----------|---------|
-| [**Master Rollout Document**](./docs/Master-Rollout-Document.md) | **GM, Fixed Ops, Service Manager** | **Primary leadership overview — start here** |
-| [**Technician Quick Start**](./docs/Technician-Quick-Start.md) | Technicians | One-page guide — voice input, story generation, bay-floor tips |
-| [**Admin Setup Guide**](./docs/Admin-Setup-Guide.md) | Service Managers & IT | Environment setup, validation, health monitoring, encryption |
-| [**Rollout Checklist**](./docs/Rollout-Checklist.md) | All rollout roles | Pre-rollout, deployment day, and post-rollout sign-off |
-| [**Training Outline**](./docs/Training-Outline.md) | Trainers & lead techs | 30–45 minute hands-on session with exercises |
-
-**Recommended rollout sequence:**
-
-1. Leadership reviews [Master Rollout Document](./docs/Master-Rollout-Document.md) and approves go-live date
-2. IT completes [Admin Setup Guide](./docs/Admin-Setup-Guide.md) and passes `npm run validate:pre-rollout`
-3. Service manager works through [Rollout Checklist](./docs/Rollout-Checklist.md) Phase 1
-4. Trainer delivers session per [Training Outline](./docs/Training-Outline.md) on deployment day
-5. Technicians keep [Bay Reference Card](./docs/Bay-Reference-Card.md) and [Technician Quick Start](./docs/Technician-Quick-Start.md) at each bay tablet
-
-Screenshot placeholders in the docs use `./docs/images/` — replace with dealership-specific captures before printing.
-
----
-
-## Production Go-Live
-
-Final deliverable package for launching Merlin to production at Mercedes-Benz dealerships. Use these documents in the order below — each step builds on the last.
-
-| Step | Document | Audience | When to use |
-|------|----------|----------|-------------|
-| 0 | [**Master Rollout Document**](./docs/Master-Rollout-Document.md) | GM, Fixed Ops, Service Manager | **Authoritative overview — read first** |
-| 1 | [**Go-Live Summary**](./docs/Go-Live-Summary.md) | GM, Fixed Ops Director | One-page approval brief (companion to Master doc) |
-| 2 | [**Admin Setup Guide**](./docs/Admin-Setup-Guide.md) | IT, Service Manager | Provision environment, database, and validation |
-| 3 | [**Rollout Checklist**](./docs/Rollout-Checklist.md) | IT, SM, FO, Trainer | Phase 1 preparation (1–2 weeks before go-live) |
-| 4 | [**Go-Live Checklist**](./docs/Go-Live-Checklist.md) | IT, SM, FO | Final go/no-go review **24–48 hours before launch** |
-| 5 | [**Training Outline**](./docs/Training-Outline.md) | Trainer, Lead Technician | 30–45 min hands-on session on deployment day |
-| 6 | [**Go-Live Email Template**](./docs/Go-Live-Email-Template.md) | Service Manager | Announce launch and training to the service team |
-| 7 | [**Technician Quick Start**](./docs/Technician-Quick-Start.md) | Technicians | Full daily reference guide |
-| 7b | [**Bay Reference Card**](./docs/Bay-Reference-Card.md) | Technicians | **Laminate at every bay tablet** — double-sided cheat sheet |
-| 8 | [**Support Playbook**](./docs/Support-Playbook.md) | IT, Service Manager | Post-launch troubleshooting and escalation |
-
-**Go-live week at a glance:**
-
-1. **T−14 to T−7** — IT completes setup; Phase 1 of [Rollout Checklist](./docs/Rollout-Checklist.md)
-2. **T−5 to T−3** — Send [Go-Live Email](./docs/Go-Live-Email-Template.md); schedule training
-3. **T−2 to T−1** — Complete [Go-Live Checklist](./docs/Go-Live-Checklist.md) go/no-go sign-off
-4. **Launch day** — Training, floor support, first live stories reviewed by service manager
-5. **T+1 to T+5** — [Support Playbook](./docs/Support-Playbook.md) active; Phase 3 verification
-
-Replace `[BRACKETED]` placeholders in each document with dealership name, go-live date, URLs, and support contacts before printing or distributing.
 
 ---
 

@@ -14,7 +14,7 @@
     "db:seed": "npx tsx prisma/seed.ts",
     "db:reencrypt": "npx tsx scripts/reencrypt-legacy-data.ts",
     "db:studio": "prisma studio",
-    "test": "tsx --test tests/**/*.test.ts",
+    "test": "tsx --test tests/unit/**/*.test.ts",
     "test:integration": "tsx --test tests/integration/**/*.test.ts",
     "setup:tesseract": "node scripts/copy-tesseract-assets.mjs",
     "postinstall": "prisma generate && npm run setup:tesseract"

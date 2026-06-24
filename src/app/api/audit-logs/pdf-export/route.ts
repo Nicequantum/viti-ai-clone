@@ -2,7 +2,7 @@ import { writeAuditLog } from '@/lib/audit';
 import { PROMPT_VERSION } from '@/prompts/version';
 import { withAuth } from '@/lib/apiRoute';
 import { prisma } from '@/lib/db';
-import { apiError } from '@/lib/errors';
+import { apiError, VALIDATION_ERROR } from '@/lib/errors';
 import { getRequestIp } from '@/lib/rate-limit';
 import { logPerformance } from '@/lib/perf';
 import { parseRequestBody, pdfExportAuditSchema } from '@/lib/validation';
