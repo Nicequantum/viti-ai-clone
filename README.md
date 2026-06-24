@@ -162,6 +162,28 @@ StableTextarea / StableInput
 
 ---
 
+## Dealership Rollout
+
+Professional onboarding package for Fixed Ops rollout across multiple Mercedes-Benz dealerships. Send these documents directly to service managers, trainers, and IT before go-live.
+
+| Document | Audience | Purpose |
+|----------|----------|---------|
+| [**Technician Quick Start**](./docs/Technician-Quick-Start.md) | Technicians | One-page guide — voice input, story generation, bay-floor tips |
+| [**Admin Setup Guide**](./docs/Admin-Setup-Guide.md) | Service Managers & IT | Environment setup, validation, health monitoring, encryption |
+| [**Rollout Checklist**](./docs/Rollout-Checklist.md) | All rollout roles | Pre-rollout, deployment day, and post-rollout sign-off |
+| [**Training Outline**](./docs/Training-Outline.md) | Trainers & lead techs | 30–45 minute hands-on session with exercises |
+
+**Recommended rollout sequence:**
+
+1. IT completes [Admin Setup Guide](./docs/Admin-Setup-Guide.md) and passes `npm run validate:pre-rollout`
+2. Service manager works through [Rollout Checklist](./docs/Rollout-Checklist.md) Phase 1
+3. Trainer delivers session per [Training Outline](./docs/Training-Outline.md) on deployment day
+4. Technicians keep [Technician Quick Start](./docs/Technician-Quick-Start.md) at each bay tablet
+
+Screenshot placeholders in the docs use `./docs/images/` — replace with dealership-specific captures before printing.
+
+---
+
 ## Deployment
 
 ### Local development
