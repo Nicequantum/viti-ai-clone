@@ -111,6 +111,8 @@ export function useRepairOrders({
   const [cdkSanitizedByLine, setCdkSanitizedByLine] = useState<Record<string, boolean>>({});
   const [storyQualityByLine, setStoryQualityByLine] = useState<Record<string, StoryQualityResult>>({});
   const [storyReviewByLine, setStoryReviewByLine] = useState<Record<string, StoryReviewResult>>({});
+  const [isScoring, setIsScoring] = useState(false);
+  const [scoringLineId, setScoringLineId] = useState<string | null>(null);
   const [isReviewing, setIsReviewing] = useState(false);
   const [reviewingLineId, setReviewingLineId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -133,6 +135,8 @@ export function useRepairOrders({
   const openingROInFlightRef = useRef<string | null>(null);
   const generateStorySeqRef = useRef(0);
   const storyGenerationInFlightRef = useRef(false);
+  const scoreStorySeqRef = useRef(0);
+  const storyScoringInFlightRef = useRef(false);
   const reviewStorySeqRef = useRef(0);
   const storyReviewInFlightRef = useRef(false);
 
@@ -330,11 +334,15 @@ export function useRepairOrders({
           setStoryQualityByLine({});
           setStoryReviewByLine({});
           generateStorySeqRef.current += 1;
+          scoreStorySeqRef.current += 1;
           reviewStorySeqRef.current += 1;
           storyGenerationInFlightRef.current = false;
+          storyScoringInFlightRef.current = false;
           storyReviewInFlightRef.current = false;
           setIsGenerating(false);
           setGeneratingLineId(null);
+          setIsScoring(false);
+          setScoringLineId(null);
           setIsReviewing(false);
           setReviewingLineId(null);
           setView('home');
@@ -363,11 +371,15 @@ export function useRepairOrders({
         setStoryQualityByLine({});
         setStoryReviewByLine({});
         generateStorySeqRef.current += 1;
+        scoreStorySeqRef.current += 1;
         reviewStorySeqRef.current += 1;
         storyGenerationInFlightRef.current = false;
+        storyScoringInFlightRef.current = false;
         storyReviewInFlightRef.current = false;
         setIsGenerating(false);
         setGeneratingLineId(null);
+        setIsScoring(false);
+        setScoringLineId(null);
         setIsReviewing(false);
         setReviewingLineId(null);
         setAllROs((prev) => {
@@ -1143,18 +1155,22 @@ export function useRepairOrders({
     });
   }, []);
 
-  const { applyCustomerPayTemplate, clearCustomerPayMode, generateStory, reviewStory } =
+  const { applyCustomerPayTemplate, clearCustomerPayMode, generateStory, scoreStory, reviewStory } =
     useROStoryWorkflow(
       {
         roRef,
         generateStorySeqRef,
+        scoreStorySeqRef,
         reviewStorySeqRef,
         storyGenerationInFlightRef,
+        storyScoringInFlightRef,
         storyReviewInFlightRef,
       },
       {
         setIsGenerating,
         setGeneratingLineId,
+        setIsScoring,
+        setScoringLineId,
         setIsReviewing,
         setReviewingLineId,
         setLastGeneratedStoryByLine,
@@ -1186,9 +1202,10 @@ export function useRepairOrders({
   const cdkSanitizedForLine = Boolean(currentLineId && cdkSanitizedByLine[currentLineId]);
 
   const isGeneratingForLine = isGenerating && generatingLineId === currentLineId;
+  const isScoringForLine = isScoring && scoringLineId === currentLineId;
   const isReviewingForLine = isReviewing && reviewingLineId === currentLineId;
   const storyQualityForLine = (() => {
-    if (!currentLineId || isGeneratingForLine || isReviewingForLine) return null;
+    if (!currentLineId || isGeneratingForLine || isScoringForLine || isReviewingForLine) return null;
     const quality = storyQualityByLine[currentLineId];
     if (!quality) return null;
     const storyText = currentLine?.warrantyStory?.trim() ?? '';
@@ -1198,13 +1215,13 @@ export function useRepairOrders({
   })();
 
   const storyReviewForLine = (() => {
-    if (!currentLineId || isGeneratingForLine || isReviewingForLine) return null;
+    if (!currentLineId || isGeneratingForLine || isScoringForLine || isReviewingForLine) return null;
     if (!storyQualityForLine) return null;
     return storyReviewByLine[currentLineId] ?? null;
   })();
 
   const storyQualityStaleForLine = (() => {
-    if (!currentLineId || isGeneratingForLine || isReviewingForLine) return false;
+    if (!currentLineId || isGeneratingForLine || isScoringForLine || isReviewingForLine) return false;
     const quality = storyQualityByLine[currentLineId];
     const storyText = currentLine?.warrantyStory?.trim() ?? '';
     if (!quality || !storyText) return false;
@@ -1256,6 +1273,7 @@ export function useRepairOrders({
     setPendingROImages,
     isGenerating,
     isGeneratingForLine,
+    isScoringForLine,
     isReviewingForLine,
     storyQualityForLine,
     storyReviewForLine,
@@ -1302,6 +1320,7 @@ export function useRepairOrders({
     applyCustomerPayTemplate,
     clearCustomerPayMode,
     generateStory,
+    scoreStory,
     reviewStory,
     acknowledgeStoryBaseline,
   };

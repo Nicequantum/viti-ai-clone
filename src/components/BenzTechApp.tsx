@@ -200,6 +200,7 @@ export function BenzTechApp() {
           isProcessingOCR={ocr.isProcessingOCR}
           ocrProgress={ocr.ocrProgress}
           isGenerating={ro.isGeneratingForLine}
+          isScoring={ro.isScoringForLine}
           isReviewing={ro.isReviewingForLine}
           storyQuality={ro.storyQualityForLine}
           storyReview={ro.storyReviewForLine}
@@ -219,6 +220,7 @@ export function BenzTechApp() {
             }
             void ro.generateStory(lineId);
           }}
+          onScoreStory={() => ro.scoreStory(ro.currentLine!.id)}
           onReviewStory={() => ro.reviewStory(ro.currentLine!.id)}
           onApplyCustomerPayTemplate={(templateId) =>
             ro.applyCustomerPayTemplate(ro.currentLine!.id, templateId)

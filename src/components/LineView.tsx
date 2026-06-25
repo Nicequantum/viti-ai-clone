@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, BookOpen, BookmarkPlus, Camera, Copy, Download, FileText, Loader2, RefreshCw, Sparkles, Zap } from 'lucide-react';
+import { ArrowLeft, BookOpen, BookmarkPlus, Camera, Copy, Download, FileText, Loader2, RefreshCw, Shield, Sparkles, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { ExtractedDataPreview } from '@/components/ExtractedDataPreview';
 import { StableInput } from '@/components/StableInput';
@@ -29,6 +29,7 @@ interface LineViewProps {
   isProcessingOCR: boolean;
   ocrProgress: number;
   isGenerating: boolean;
+  isScoring: boolean;
   isReviewing: boolean;
   storyQuality: StoryQualityResult | null;
   storyReview: StoryReviewResult | null;
@@ -41,6 +42,7 @@ interface LineViewProps {
   onAddXentryPhotos: () => void;
   onDeleteXentryImage: (imageId: string) => void;
   onGenerateStory: () => void;
+  onScoreStory: () => void;
   onReviewStory: () => void;
   onApplyCustomerPayTemplate: (templateId: string) => void | Promise<void>;
   onClearCustomerPayMode?: () => void | Promise<void>;
@@ -64,6 +66,7 @@ export function LineView({
   isProcessingOCR,
   ocrProgress,
   isGenerating,
+  isScoring,
   isReviewing,
   storyQuality,
   storyReview,
@@ -76,6 +79,7 @@ export function LineView({
   onAddXentryPhotos,
   onDeleteXentryImage,
   onGenerateStory,
+  onScoreStory,
   onReviewStory,
   onApplyCustomerPayTemplate,
   onClearCustomerPayMode,
@@ -91,22 +95,14 @@ export function LineView({
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
 
-  const [storyEditedSinceGenerate, setStoryEditedSinceGenerate] = useState(false);
-
   useEffect(() => {
     setShowSaveTemplate(false);
     setShowTemplateLibrary(false);
-    setStoryEditedSinceGenerate(false);
   }, [line.id]);
 
-  useEffect(() => {
-    setStoryEditedSinceGenerate(false);
-  }, [lastGeneratedStoryText]);
-
   const canSaveAsTemplate = useMemo(() => {
-    if (!lastGeneratedStoryText || !line.warrantyStory?.trim()) return false;
-    return storyEditedSinceGenerate;
-  }, [lastGeneratedStoryText, line.warrantyStory, storyEditedSinceGenerate]);
+    return Boolean(lastGeneratedStoryText && line.warrantyStory?.trim());
+  }, [lastGeneratedStoryText, line.warrantyStory]);
 
   const defaultTemplateTitle = useMemo(() => {
     const base = line.description?.trim() || 'Warranty Story';
@@ -297,7 +293,7 @@ export function LineView({
               <button
                 type="button"
                 onClick={handleGenerateStory}
-                disabled={isGenerating || isReviewing}
+                disabled={isGenerating || isScoring || isReviewing}
                 className="primary-btn w-full h-13 text-base flex items-center justify-center gap-2.5 disabled:opacity-50 touch-target"
               >
                 {isGenerating ? (
@@ -321,7 +317,7 @@ export function LineView({
             <button
               type="button"
               onClick={() => setShowTemplateLibrary(true)}
-              disabled={isGenerating || isReviewing}
+              disabled={isGenerating || isScoring || isReviewing}
               className="benz-tertiary-link disabled:opacity-50"
             >
               {isCustomerPayLine ? 'Change Customer Pay template' : 'Browse template library'}
@@ -334,7 +330,7 @@ export function LineView({
                 <button
                   type="button"
                   onClick={() => void onClearCustomerPayMode()}
-                  disabled={isGenerating || isReviewing}
+                  disabled={isGenerating || isScoring || isReviewing}
                   className="secondary-btn benz-btn-accent-outline h-10 w-full mt-2 text-sm font-medium disabled:opacity-50"
                 >
                   Switch to warranty AI
@@ -345,7 +341,7 @@ export function LineView({
               <button
                 type="button"
                 onClick={() => setShowSaveTemplate(true)}
-                disabled={isGenerating || isReviewing}
+                disabled={isGenerating || isScoring || isReviewing}
                 className="benz-tertiary-link text-benz-green disabled:opacity-50"
               >
                 Save as template
@@ -416,7 +412,6 @@ export function LineView({
                 value={line.warrantyStory}
                 onChange={(v) => {
                   onClearCdkSanitizedNotice?.();
-                  setStoryEditedSinceGenerate(true);
                   onUpdateLine({ warrantyStory: v });
                 }}
                 className="benz-textarea text-[15px] leading-relaxed mb-4 min-h-[220px]"
@@ -432,16 +427,17 @@ export function LineView({
                     progress={generationPhase.progress}
                   />
                 )}
-                {!isGenerating && isReviewing && <StoryQualityLoadingPanel mode="reviewing" />}
-                {!isGenerating && !isReviewing && storyQuality && (
+                {!isGenerating && isScoring && <StoryQualityLoadingPanel mode="scoring" />}
+                {!isGenerating && !isScoring && isReviewing && <StoryQualityLoadingPanel mode="reviewing" />}
+                {!isGenerating && !isScoring && !isReviewing && storyQuality && (
                   <StoryQualityPanel
                     quality={storyQuality}
                     review={storyReview}
                     panelKey={`${line.id}:${storyQuality.scoredAgainstStory ?? ''}:${storyQuality.score}`}
                   />
                 )}
-                {!isGenerating && !isReviewing && !storyQuality && storyQualityStale && (
-                  <StoryQualityStaleBanner onReview={onReviewStory} />
+                {!isGenerating && !isScoring && !isReviewing && !storyQuality && storyQualityStale && (
+                  <StoryQualityStaleBanner onAudit={onScoreStory} />
                 )}
               </div>
             )}
@@ -457,12 +453,39 @@ export function LineView({
               </button>
 
               {!isCustomerPayLine && (
-                <div className="grid grid-cols-2 gap-2.5">
+                <>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={onScoreStory}
+                      disabled={isGenerating || isScoring || isReviewing || !line.warrantyStory?.trim()}
+                      className="secondary-btn benz-btn-accent-outline h-12 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                    >
+                      {isScoring ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" /> Auditing…
+                        </>
+                      ) : (
+                        <>
+                          <Shield size={16} /> Audit Story
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleGenerateStory}
+                      disabled={isGenerating || isScoring || isReviewing}
+                      className="secondary-btn h-12 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                    >
+                      {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                      Regenerate
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={onReviewStory}
-                    disabled={isGenerating || isReviewing || !line.warrantyStory?.trim()}
-                    className="secondary-btn benz-btn-accent-outline h-12 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                    disabled={isGenerating || isScoring || isReviewing || !line.warrantyStory?.trim()}
+                    className="secondary-btn h-11 w-full flex items-center justify-center gap-2 text-sm disabled:opacity-50"
                   >
                     {isReviewing ? (
                       <>
@@ -474,16 +497,7 @@ export function LineView({
                       </>
                     )}
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleGenerateStory}
-                    disabled={isGenerating || isReviewing}
-                    className="secondary-btn h-12 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
-                  >
-                    {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                    Regenerate
-                  </button>
-                </div>
+                </>
               )}
 
               <div className="flex flex-wrap items-center justify-center gap-1 pt-1">

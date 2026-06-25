@@ -9,14 +9,18 @@ import type { RepairOrder, StoryQualityResult, StoryReviewResult } from '@/types
 interface StoryWorkflowRefs {
   roRef: React.MutableRefObject<RepairOrder | null>;
   generateStorySeqRef: React.MutableRefObject<number>;
+  scoreStorySeqRef: React.MutableRefObject<number>;
   reviewStorySeqRef: React.MutableRefObject<number>;
   storyGenerationInFlightRef: React.MutableRefObject<boolean>;
+  storyScoringInFlightRef: React.MutableRefObject<boolean>;
   storyReviewInFlightRef: React.MutableRefObject<boolean>;
 }
 
 interface StoryWorkflowSetters {
   setIsGenerating: React.Dispatch<React.SetStateAction<boolean>>;
   setGeneratingLineId: React.Dispatch<React.SetStateAction<string | null>>;
+  setIsScoring: React.Dispatch<React.SetStateAction<boolean>>;
+  setScoringLineId: React.Dispatch<React.SetStateAction<string | null>>;
   setIsReviewing: React.Dispatch<React.SetStateAction<boolean>>;
   setReviewingLineId: React.Dispatch<React.SetStateAction<string | null>>;
   setLastGeneratedStoryByLine: React.Dispatch<React.SetStateAction<Record<string, string>>>;
@@ -166,26 +170,7 @@ export function useROStoryWorkflow(
         refs.storyGenerationInFlightRef.current = false;
         setters.setIsGenerating(false);
         setters.setGeneratingLineId(null);
-        toast.success('Warranty story generated');
-
-        void (async () => {
-          try {
-            const scored = await api.scoreStory(latestRO.id, lineId, warrantyStory);
-            if (seq !== refs.generateStorySeqRef.current) return;
-
-            const quality = scored.quality;
-            const baseline = (quality.scoredAgainstStory ?? warrantyStory).trim();
-            if (baseline === warrantyStory.trim()) {
-              setters.setStoryQualityByLine((prev) => ({
-                ...prev,
-                [lineId]: { ...quality, scoredAgainstStory: baseline },
-              }));
-              toast.message(`MI 4.3 score: ${quality.score}/100`);
-            }
-          } catch {
-            // Scoring is best-effort — story is already saved and visible.
-          }
-        })();
+        toast.success('Warranty story generated — tap Audit Story when ready for MI scoring');
       } catch (error: unknown) {
         if (seq === refs.generateStorySeqRef.current) {
           toast.error(error instanceof Error ? error.message : 'Story generation failed');
@@ -201,9 +186,82 @@ export function useROStoryWorkflow(
     [deps, refs, setters]
   );
 
+  const scoreStory = useCallback(
+    async (lineId: string) => {
+      if (refs.storyScoringInFlightRef.current) return;
+      if (refs.storyGenerationInFlightRef.current) {
+        toast.error('Wait for story generation to finish before auditing');
+        return;
+      }
+      await deps.flushPendingSave();
+      const latestRO = refs.roRef.current;
+      const targetLine = latestRO?.repairLines.find((l) => l.id === lineId);
+      if (isCustomerPayRepairLine(targetLine)) {
+        toast.message('Customer Pay stories skip AI audit — edit the text if needed.');
+        return;
+      }
+      if (!latestRO) return;
+      const roId = latestRO.id;
+      const storyText = targetLine?.warrantyStory?.trim();
+      if (!storyText) {
+        toast.error('Generate or write a warranty story before running the audit');
+        return;
+      }
+
+      setters.setStoryReviewByLine((prev) => {
+        if (!prev[lineId]) return prev;
+        const next = { ...prev };
+        delete next[lineId];
+        return next;
+      });
+      const seq = ++refs.scoreStorySeqRef.current;
+      refs.storyScoringInFlightRef.current = true;
+      setters.setScoringLineId(lineId);
+      setters.setIsScoring(true);
+      toast.message('Running MI quality audit…');
+
+      try {
+        const { quality } = await api.scoreStory(roId, lineId, storyText);
+        if (seq !== refs.scoreStorySeqRef.current) return;
+
+        const activeRO = refs.roRef.current;
+        if (!activeRO || activeRO.id !== roId) {
+          toast.success('Audit complete — reopen the repair line to view the score');
+          return;
+        }
+
+        const activeLine = activeRO.repairLines.find((l) => l.id === lineId);
+        const currentStory = activeLine?.warrantyStory?.trim() ?? '';
+        if (!currentStory || currentStory !== storyText) return;
+
+        const baseline = (quality.scoredAgainstStory ?? storyText).trim();
+        setters.setStoryQualityByLine((prev) => ({
+          ...prev,
+          [lineId]: { ...quality, scoredAgainstStory: baseline },
+        }));
+        toast.success(`MI audit score: ${quality.score}/100 (${quality.grade})`);
+      } catch (error: unknown) {
+        if (seq === refs.scoreStorySeqRef.current) {
+          toast.error(error instanceof Error ? error.message : 'Story audit failed');
+        }
+      } finally {
+        if (seq === refs.scoreStorySeqRef.current) {
+          refs.storyScoringInFlightRef.current = false;
+          setters.setIsScoring(false);
+          setters.setScoringLineId(null);
+        }
+      }
+    },
+    [deps, refs, setters]
+  );
+
   const reviewStory = useCallback(
     async (lineId: string) => {
       if (refs.storyReviewInFlightRef.current) return;
+      if (refs.storyScoringInFlightRef.current) {
+        toast.error('Wait for the audit to finish before running a full review');
+        return;
+      }
       if (refs.storyGenerationInFlightRef.current) {
         toast.error('Wait for story generation to finish before reviewing');
         return;
@@ -264,5 +322,5 @@ export function useROStoryWorkflow(
     [deps, refs, setters]
   );
 
-  return { applyCustomerPayTemplate, clearCustomerPayMode, generateStory, reviewStory };
+  return { applyCustomerPayTemplate, clearCustomerPayMode, generateStory, scoreStory, reviewStory };
 }

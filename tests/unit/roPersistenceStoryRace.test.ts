@@ -44,10 +44,16 @@ describe('RO persistence story race guards', () => {
     assert.match(src, /roRef\.current\?\.id === ro\.id \? roRef\.current : ro/);
   });
 
-  test('Save as Template uses explicit edit flag instead of string diff', () => {
+  test('Save as Template stays visible when a generated story exists', () => {
     const src = readFileSync(join(process.cwd(), 'src/components/LineView.tsx'), 'utf8');
-    assert.match(src, /storyEditedSinceGenerate/);
-    assert.doesNotMatch(src, /warrantyStory\.trim\(\) !== lastGeneratedStoryText\.trim\(\)/);
+    assert.match(src, /lastGeneratedStoryText && line\.warrantyStory/);
+    assert.doesNotMatch(src, /storyEditedSinceGenerate/);
+  });
+
+  test('story generation does not auto-score after API returns', () => {
+    const src = readFileSync(join(process.cwd(), 'src/hooks/repairOrders/useROStoryWorkflow.ts'), 'utf8');
+    assert.match(src, /scoreStory/);
+    assert.doesNotMatch(src, /void \(async \(\) => \{[\s\S]*api\.scoreStory/);
   });
 
   test('generate story workflow skips immediate RO save after API', () => {
