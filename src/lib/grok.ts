@@ -29,6 +29,9 @@ import { parseStructuredROText } from '@/utils/roExtractor';
 
 const GROK_API_URL = 'https://api.x.ai/v1/chat/completions';
 
+/** xAI chat model — Grok 4.3 for story generation, scoring, and vision extraction. */
+export const GROK_CHAT_MODEL = 'grok-4.3';
+
 export function isGrokConfigured(): boolean {
   try {
     getGrokApiKey();
@@ -58,7 +61,7 @@ async function grokChat(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'grok-3',
+        model: GROK_CHAT_MODEL,
         messages,
         temperature: options.temperature,
         max_tokens: options.max_tokens,
@@ -74,14 +77,14 @@ async function grokChat(
     const apiResponse = await response.json();
     const content = apiResponse.choices?.[0]?.message?.content?.trim() || '';
     logPerformance(options.perfLabel || 'grok.chat', Date.now() - startedAt, {
-      model: 'grok-3',
+      model: GROK_CHAT_MODEL,
       maxTokens: options.max_tokens,
       outcome: 'ok',
     });
     return content;
   } catch (error) {
     logPerformance(options.perfLabel || 'grok.chat', Date.now() - startedAt, {
-      model: 'grok-3',
+      model: GROK_CHAT_MODEL,
       outcome: 'error',
       error: error instanceof Error ? error.message : 'unknown',
     });

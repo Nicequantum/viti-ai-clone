@@ -1,6 +1,7 @@
 import type { RepairLine, RepairOrder } from '../types';
 import { formatExtractedDataForPrompt } from '@/utils/diagnosticParser';
 import { MI_AUDIT_GUIDELINES, MI_GENERATION_STYLE_RULES } from './miAuditGuidelines';
+import { STYLE_VARIATION_SYSTEM_RULES, buildStoryStyleVariationBlock } from './storyStyleVariation';
 import { PROMPT_VERSION, getDealershipPromptRules } from './version';
 
 export const WARRANTY_STORY_TEMPERATURE = 0.25;
@@ -28,6 +29,8 @@ Prompt version: ${PROMPT_VERSION}
 ${MI_AUDIT_GUIDELINES}
 
 ${MI_GENERATION_STYLE_RULES}
+
+${STYLE_VARIATION_SYSTEM_RULES}
 ${dealershipRules ? `\n### DEALERSHIP-SPECIFIC RULES\n${dealershipRules}\n` : ''}
 
 ## HOW TO WRITE (VOICE, FLOW, AND CRAFT)
@@ -145,6 +148,8 @@ ${workflowChecklist}
 - For undocumented voltage, Quick Test, guided tests, repairs, or drives, use [NOT DOCUMENTED] or [NOT PROVIDED].
 - Vary phrasing across steps. Narrative style: ${selectedTemplate}
 - If Knowledge Base references are in the system prompt, prioritize dealership-saved stories for tone and sequencing.
+
+${buildStoryStyleVariationBlock()}
 
 Write only the warranty story for this specific line.`;
 }

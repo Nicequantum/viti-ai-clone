@@ -30,7 +30,7 @@ interface StoryQualityStaleProps {
 }
 
 const GRADE_LABELS: Record<StoryQualityResult['grade'], string> = {
-  excellent: 'MI 2.0 Ready',
+  excellent: 'MI 4.3 Ready',
   strong: 'Strong — Minor Polish',
   'needs-work': 'Needs Work',
   'at-risk': 'At Risk',
@@ -58,14 +58,14 @@ function scoreRingClass(score: number): string {
 export function StoryQualityLoadingPanel({ mode }: StoryQualityLoadingProps) {
   const label =
     mode === 'generating'
-      ? 'Generating story and scoring against MI 2.0…'
-      : 'Reviewing story against MI 2.0 audit criteria…';
+      ? 'Generating story and scoring against MI 4.3…'
+      : 'Reviewing story against MI 4.3 audit criteria…';
 
   return (
     <div className="benz-card p-4 flex items-center gap-3.5">
       <Loader2 size={22} className="animate-spin text-benz-blue shrink-0" />
       <div>
-        <div className="benz-section-title">MI 2.0 Quality</div>
+        <div className="benz-section-title">MI 4.3 Quality</div>
         <p className="text-sm text-benz-silver mt-1">{label}</p>
       </div>
     </div>
@@ -79,7 +79,7 @@ export function StoryQualityStaleBanner({ onReview }: StoryQualityStaleProps) {
       <div className="flex-1 min-w-0">
         <div className="text-xs uppercase tracking-widest font-semibold text-benz-amber">Score Outdated</div>
         <p className="text-sm text-benz-silver mt-1 leading-snug">
-          This story was edited after the last score. Run Review with AI to get an accurate MI 2.0 assessment.
+          This story was edited after the last score. Run Review with AI to get an accurate MI 4.3 assessment.
         </p>
         {onReview && (
           <button type="button" onClick={onReview} className="mt-2.5 text-xs benz-link font-medium">
@@ -118,7 +118,7 @@ export function StoryQualityPanel({ quality, review, panelKey }: StoryQualityPan
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <Shield size={14} className="text-benz-blue" />
-            <span className="benz-section-title">MI 2.0 Quality Score</span>
+            <span className="benz-section-title">MI 4.3 Quality Score</span>
             <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${ringClass}`}>
               {GRADE_LABELS[quality.grade]}
             </span>
@@ -140,7 +140,7 @@ export function StoryQualityPanel({ quality, review, panelKey }: StoryQualityPan
                 <Wrench size={12} /> Add Technician Details
               </div>
               <p className="text-xs text-benz-secondary mb-3 leading-snug">
-                MI 2.0 flagged these specific gaps. Add the missing details to your notes or story before submission.
+                MI 4.3 flagged these specific gaps. Add the missing details to your notes or story before submission.
               </p>
               <ul className="space-y-3">
                 {quality.technicianDetails.map((detail, index) => (
@@ -179,7 +179,7 @@ export function StoryQualityPanel({ quality, review, panelKey }: StoryQualityPan
           {quality.improvements.length > 0 && (
             <div>
               <div className="text-xs uppercase tracking-wider font-semibold text-benz-amber mb-2 flex items-center gap-1.5">
-                <Target size={12} /> Improve for MI 2.0
+                <Target size={12} /> Improve for MI 4.3
               </div>
               <ul className="space-y-1.5">
                 {quality.improvements.map((item) => (

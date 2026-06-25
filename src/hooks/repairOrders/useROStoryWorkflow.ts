@@ -171,7 +171,7 @@ export function useROStoryWorkflow(
         }
         toast.success(
           quality
-            ? `Warranty story generated — MI 2.0 score: ${quality.score}/100`
+            ? `Warranty story generated — MI 4.3 score: ${quality.score}/100`
             : 'Warranty story generated'
         );
       } catch (error: unknown) {
@@ -236,7 +236,7 @@ export function useROStoryWorkflow(
 
         setters.setStoryReviewByLine((prev) => ({ ...prev, [lineId]: review }));
         setters.setStoryQualityByLine((prev) => ({ ...prev, [lineId]: review }));
-        toast.success(`MI 2.0 review complete — ${review.score}/100 (${review.grade})`);
+        toast.success(`MI 4.3 review complete — ${review.score}/100 (${review.grade})`);
       } catch (error: unknown) {
         if (seq === refs.reviewStorySeqRef.current) {
           toast.error(error instanceof Error ? error.message : 'Story review failed');

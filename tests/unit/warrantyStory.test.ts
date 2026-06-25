@@ -42,7 +42,7 @@ const baseLine: RepairLine = {
 };
 
 describe('warranty story prompts', () => {
-  test('SYSTEM_PROMPT requires natural paragraphs and full workflow sequence', () => {
+  test('SYSTEM_PROMPT requires natural paragraphs, full workflow sequence, and style variation', () => {
     assert.match(SYSTEM_PROMPT, /Merlin/i);
     assert.match(SYSTEM_PROMPT, /Mercedes Intelligence 2\.0/i);
     assert.match(SYSTEM_PROMPT, /Natural 3 C's flow|natural paragraph|flowing paragraphs/i);
@@ -52,6 +52,9 @@ describe('warranty story prompts', () => {
     assert.match(SYSTEM_PROMPT, /Quick Test/i);
     assert.match(SYSTEM_PROMPT, /10 workflow steps/i);
     assert.match(SYSTEM_PROMPT, /\[NOT DOCUMENTED\]/);
+    assert.match(SYSTEM_PROMPT, /NATURAL STYLE VARIATION/i);
+    assert.match(SYSTEM_PROMPT, /Sentence structure and rhythm/i);
+    assert.match(SYSTEM_PROMPT, /Transitional phrases/i);
     assert.doesNotMatch(SYSTEM_PROMPT, /Use clear 3 C's section headers/i);
   });
 
@@ -68,7 +71,7 @@ describe('warranty story prompts', () => {
     }
   });
 
-  test('buildWarrantyStoryUserMessage injects workflow checklist and natural format requirements', () => {
+  test('buildWarrantyStoryUserMessage injects workflow checklist, natural format, and style variation', () => {
     const message = buildWarrantyStoryUserMessage(baseRo, baseLine, '', 0);
     assert.match(message, /Required workflow/i);
     assert.match(message, /Initial test drive to confirm\/reproduce/i);
@@ -78,6 +81,10 @@ describe('warranty story prompts', () => {
     assert.match(message, /28450 → 28458/);
     assert.match(message, /P0300/);
     assert.match(message, /Chronological narrative/);
+    assert.match(message, /Style variation for THIS story/i);
+    assert.match(message, /Sentence rhythm:/i);
+    assert.match(message, /Technical detail emphasis:/i);
+    assert.match(message, /Transitional phrasing:/i);
   });
 
   test('buildWarrantyStoryUserMessage selects template by index', () => {

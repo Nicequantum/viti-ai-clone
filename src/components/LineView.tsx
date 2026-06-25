@@ -323,10 +323,10 @@ export function LineView({
               {isGenerating ? (
                 <>
                   <Loader2 size={20} className="animate-spin" />
-                  Generating with Grok…
+                  Generating MI 4.3…
                 </>
               ) : (
-                'Generate warranty story'
+                'Generate MI 4.3'
               )}
             </button>
           )}
@@ -370,7 +370,7 @@ export function LineView({
           <p className="benz-hint text-center">
             {isCustomerPayLine
               ? 'Customer Pay templates skip AI — pick another template or edit the story below.'
-              : 'Generate MI 2.0–ready stories, review with AI, edit, then save to grow your knowledge base.'}
+              : 'Generate MI 4.3–ready stories, review with AI, edit, then save to grow your knowledge base.'}
           </p>
         </div>
 
@@ -383,7 +383,7 @@ export function LineView({
                 ? 'Pick an instant template from the library — no AI wait time.'
                 : 'Generate with Grok or browse templates to start your 3 C\'s narrative.'
             }
-            actionLabel={isCustomerPayLine ? 'Browse Customer Pay templates' : 'Generate warranty story'}
+            actionLabel={isCustomerPayLine ? 'Browse Customer Pay templates' : 'Generate MI 4.3'}
             onAction={() => (isCustomerPayLine ? setShowTemplateLibrary(true) : handleGenerateStory())}
             className="benz-story-empty-state"
           />
