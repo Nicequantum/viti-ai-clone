@@ -25,7 +25,12 @@ export { PROMPT_VERSION };
 import type { ExtractedData, RepairLine, RepairOrder } from '@/types';
 import { normalizeExtractedData, parseDiagnosticExtractionJson } from '@/utils/diagnosticParser';
 import { logPerformance } from '@/lib/perf';
-import { DIAGNOSTIC_EXTRACT_GROK_MS, RO_EXTRACT_GROK_MS } from '@/lib/timeouts';
+import {
+  DIAGNOSTIC_EXTRACT_GROK_MS,
+  RO_EXTRACT_GROK_MS,
+  STORY_GENERATE_GROK_MS,
+  STORY_SCORE_GROK_MS,
+} from '@/lib/timeouts';
 import { parseStructuredROText } from '@/utils/roExtractor';
 
 const GROK_API_URL = 'https://api.x.ai/v1/chat/completions';
@@ -48,17 +53,27 @@ export function isGrokConfigured(): boolean {
   }
 }
 
+export type GrokReasoningEffort = 'none' | 'low' | 'medium' | 'high';
+
 async function grokChat(
   messages: Array<{
     role: string;
     content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
   }>,
-  options: { temperature: number; max_tokens: number; timeoutMs?: number; perfLabel?: string }
+  options: {
+    temperature: number;
+    max_tokens: number;
+    timeoutMs?: number;
+    perfLabel?: string;
+    /** grok-4.3 defaults to low reasoning — disable for latency-sensitive paths. */
+    reasoningEffort?: GrokReasoningEffort;
+  }
 ): Promise<string> {
   const timeoutMs = options.timeoutMs ?? 55_000;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const startedAt = Date.now();
+  const reasoningEffort = options.reasoningEffort ?? 'none';
 
   try {
     const response = await fetch(GROK_API_URL, {
@@ -72,6 +87,7 @@ async function grokChat(
         messages,
         temperature: options.temperature,
         max_tokens: options.max_tokens,
+        reasoning_effort: reasoningEffort,
       }),
       signal: controller.signal,
     });
@@ -86,6 +102,7 @@ async function grokChat(
     logPerformance(options.perfLabel || 'grok.chat', Date.now() - startedAt, {
       model: GROK_CHAT_MODEL,
       maxTokens: options.max_tokens,
+      reasoningEffort,
       outcome: 'ok',
     });
     return content;
@@ -124,8 +141,9 @@ export async function generateWarrantyStory(
     {
       temperature: WARRANTY_STORY_TEMPERATURE,
       max_tokens: WARRANTY_STORY_MAX_TOKENS,
-      timeoutMs: 110_000,
+      timeoutMs: STORY_GENERATE_GROK_MS,
       perfLabel: 'grok.story.generate',
+      reasoningEffort: 'none',
     }
   );
   return story || 'No story generated.';
@@ -144,8 +162,9 @@ export async function scoreWarrantyStory(
     {
       temperature: 0.1,
       max_tokens: WARRANTY_STORY_SCORE_MAX_TOKENS,
-      timeoutMs: 60_000,
+      timeoutMs: STORY_SCORE_GROK_MS,
       perfLabel: 'grok.story.score',
+      reasoningEffort: 'none',
     }
   );
   return parseStoryQualityResponse(raw);
@@ -161,7 +180,13 @@ export async function reviewWarrantyStory(
       { role: 'system', content: STORY_REVIEW_SYSTEM_PROMPT },
       { role: 'user', content: buildStoryReviewUserMessage(ro, line, warrantyStory) },
     ],
-    { temperature: 0.15, max_tokens: 1400, timeoutMs: 90_000, perfLabel: 'grok.story.review' }
+    {
+      temperature: 0.15,
+      max_tokens: 1400,
+      timeoutMs: 90_000,
+      perfLabel: 'grok.story.review',
+      reasoningEffort: 'none',
+    }
   );
   return parseStoryReviewResponse(raw);
 }

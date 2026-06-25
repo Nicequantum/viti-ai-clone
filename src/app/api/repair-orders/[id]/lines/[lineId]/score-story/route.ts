@@ -9,6 +9,10 @@ import { getRequestIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { mapGrokRouteError } from '@/lib/grokErrors';
 import { PROMPT_VERSION } from '@/prompts/version';
 import { parseRequestBody, reviewStorySchema } from '@/lib/validation';
+import { STORY_SCORE_ROUTE_MAX_DURATION_S } from '@/lib/timeouts';
+
+/** Keep in sync with STORY_SCORE_ROUTE_MAX_DURATION_S in `@/lib/timeouts`. */
+export const maxDuration = STORY_SCORE_ROUTE_MAX_DURATION_S;
 
 export async function POST(
   request: Request,

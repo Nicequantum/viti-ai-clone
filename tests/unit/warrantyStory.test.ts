@@ -43,20 +43,16 @@ const baseLine: RepairLine = {
 };
 
 describe('warranty story prompts', () => {
-  test('SYSTEM_PROMPT requires natural paragraphs, full workflow sequence, and style variation', () => {
+  test('SYSTEM_PROMPT uses compact generation rules (style variation in user message)', () => {
     assert.match(SYSTEM_PROMPT, /Merlin/i);
-    assert.match(SYSTEM_PROMPT, /Mercedes Intelligence 2\.0/i);
-    assert.match(SYSTEM_PROMPT, /Natural 3 C's flow|natural paragraph|flowing paragraphs/i);
-    assert.match(SYSTEM_PROMPT, /NO visible section headers/i);
-    assert.match(SYSTEM_PROMPT, /Required workflow sequence/i);
-    assert.match(SYSTEM_PROMPT, /test drive/i);
+    assert.match(SYSTEM_PROMPT, /MI 2\.0/i);
+    assert.match(SYSTEM_PROMPT, /flowing paragraphs|natural prose/i);
+    assert.match(SYSTEM_PROMPT, /no visible headings/i);
     assert.match(SYSTEM_PROMPT, /Quick Test/i);
     assert.match(SYSTEM_PROMPT, /10 workflow steps/i);
     assert.match(SYSTEM_PROMPT, /\[NOT DOCUMENTED\]/);
-    assert.match(SYSTEM_PROMPT, /NATURAL STYLE VARIATION/i);
-    assert.match(SYSTEM_PROMPT, /Sentence structure and rhythm/i);
-    assert.match(SYSTEM_PROMPT, /Transitional phrases/i);
-    assert.doesNotMatch(SYSTEM_PROMPT, /Use clear 3 C's section headers/i);
+    assert.match(SYSTEM_PROMPT, /style variation arrives in the user message/i);
+    assert.doesNotMatch(SYSTEM_PROMPT, /NATURAL STYLE VARIATION \(CRITICAL/i);
   });
 
   test('WARRANTY_WORKFLOW_STEPS lists all 10 billing/audit steps in order', () => {
@@ -94,6 +90,6 @@ describe('warranty story prompts', () => {
   });
 
   test('WARRANTY_STORY_MAX_TOKENS limits generation output', () => {
-    assert.equal(WARRANTY_STORY_MAX_TOKENS, 800);
+    assert.equal(WARRANTY_STORY_MAX_TOKENS, 550);
   });
 });

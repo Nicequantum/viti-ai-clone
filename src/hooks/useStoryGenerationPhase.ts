@@ -2,15 +2,14 @@
 
 import { useEffect, useState } from 'react';
 
-/** Rotating status copy while Grok generates + scores a warranty story. */
+/** Rotating status copy while Grok generates a warranty story (scoring runs separately). */
 export const STORY_GENERATION_PHASES = [
   'Thinking…',
   'Writing story…',
   'Polishing narrative…',
-  'Scoring quality…',
 ] as const;
 
-const PHASE_THRESHOLDS_MS = [0, 2_500, 9_000, 22_000] as const;
+const PHASE_THRESHOLDS_MS = [0, 2_000, 6_000] as const;
 
 export function useStoryGenerationPhase(active: boolean): { message: string; progress: number } {
   const [elapsedMs, setElapsedMs] = useState(0);

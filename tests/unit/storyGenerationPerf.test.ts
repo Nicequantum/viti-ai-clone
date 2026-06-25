@@ -45,14 +45,16 @@ const baseLine: RepairLine = {
 };
 
 describe('story generation performance settings', () => {
-  test('uses grok-4.3 model identifier from xAI docs', () => {
+  test('uses grok-4.3 with reasoning disabled for latency', () => {
     const grokSrc = readFileSync(join(process.cwd(), 'src/lib/grok.ts'), 'utf8');
     assert.match(grokSrc, /GROK_CHAT_MODEL = 'grok-4\.3'/);
     assert.match(grokSrc, /WARRANTY_STORY_SCORE_MAX_TOKENS = 650/);
+    assert.match(grokSrc, /reasoning_effort: reasoningEffort/);
+    assert.match(grokSrc, /reasoningEffort: 'none'/);
   });
 
   test('caps generation and score output tokens', () => {
-    assert.equal(WARRANTY_STORY_MAX_TOKENS, 800);
+    assert.equal(WARRANTY_STORY_MAX_TOKENS, 550);
     assert.ok(WARRANTY_STORY_TEMPERATURE <= 0.25);
   });
 
@@ -70,9 +72,9 @@ describe('story generation performance settings', () => {
     assert.ok(STORY_SCORE_SYSTEM_PROMPT.length < 1_800);
   });
 
-  test('generation phase messages cover thinking through scoring', () => {
-    assert.equal(STORY_GENERATION_PHASES.length, 4);
+  test('generation phase messages cover story writing only', () => {
+    assert.equal(STORY_GENERATION_PHASES.length, 3);
     assert.match(STORY_GENERATION_PHASES[0], /Thinking/i);
-    assert.match(STORY_GENERATION_PHASES[3], /Scoring/i);
+    assert.match(STORY_GENERATION_PHASES[2], /Polishing/i);
   });
 });

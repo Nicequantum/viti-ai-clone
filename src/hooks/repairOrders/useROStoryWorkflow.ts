@@ -163,36 +163,36 @@ export function useROStoryWorkflow(
           toast.message('Story cleaned for CDK compatibility');
         }
 
-        let quality: StoryQualityResult | null = null;
-        try {
-          const scored = await api.scoreStory(latestRO.id, lineId, warrantyStory);
-          if (seq !== refs.generateStorySeqRef.current) return;
-          quality = scored.quality;
-        } catch {
-          // Scoring is best-effort — story is already saved and visible.
-        }
+        // Story is saved — release the UI immediately; score asynchronously.
+        refs.storyGenerationInFlightRef.current = false;
+        setters.setIsGenerating(false);
+        setters.setGeneratingLineId(null);
+        toast.success('Warranty story generated');
 
-        if (quality) {
-          const baseline = (quality.scoredAgainstStory ?? warrantyStory).trim();
-          if (baseline === warrantyStory.trim()) {
-            setters.setStoryQualityByLine((prev) => ({
-              ...prev,
-              [lineId]: { ...quality, scoredAgainstStory: baseline },
-            }));
+        void (async () => {
+          try {
+            const scored = await api.scoreStory(latestRO.id, lineId, warrantyStory);
+            if (seq !== refs.generateStorySeqRef.current) return;
+
+            const quality = scored.quality;
+            const baseline = (quality.scoredAgainstStory ?? warrantyStory).trim();
+            if (baseline === warrantyStory.trim()) {
+              setters.setStoryQualityByLine((prev) => ({
+                ...prev,
+                [lineId]: { ...quality, scoredAgainstStory: baseline },
+              }));
+              toast.message(`MI 4.3 score: ${quality.score}/100`);
+            }
+          } catch {
+            // Scoring is best-effort — story is already saved and visible.
           }
-        }
-
-        toast.success(
-          quality
-            ? `Warranty story generated — MI 4.3 score: ${quality.score}/100`
-            : 'Warranty story generated'
-        );
+        })();
       } catch (error: unknown) {
         if (seq === refs.generateStorySeqRef.current) {
           toast.error(error instanceof Error ? error.message : 'Story generation failed');
         }
       } finally {
-        if (seq === refs.generateStorySeqRef.current) {
+        if (seq === refs.generateStorySeqRef.current && refs.storyGenerationInFlightRef.current) {
           refs.storyGenerationInFlightRef.current = false;
           setters.setIsGenerating(false);
           setters.setGeneratingLineId(null);

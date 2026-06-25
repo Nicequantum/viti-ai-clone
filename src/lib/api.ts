@@ -16,7 +16,12 @@ import type {
   ExtractedData,
   UsageAnalytics,
 } from '@/types';
-import { DIAGNOSTIC_EXTRACT_CLIENT_MS, RO_EXTRACT_CLIENT_MS } from '@/lib/timeouts';
+import {
+  DIAGNOSTIC_EXTRACT_CLIENT_MS,
+  RO_EXTRACT_CLIENT_MS,
+  STORY_GENERATE_CLIENT_MS,
+  STORY_SCORE_CLIENT_MS,
+} from '@/lib/timeouts';
 
 export interface TechnicianUser {
   id: string;
@@ -200,13 +205,13 @@ export const api = {
   generateStory: (roId: string, lineId: string) =>
     apiFetch<{ warrantyStory: string; quality: StoryQualityResult | null; cdkSanitized?: boolean }>(
       `/api/repair-orders/${roId}/lines/${lineId}/generate-story`,
-      { method: 'POST', timeoutMs: 120_000 }
+      { method: 'POST', timeoutMs: STORY_GENERATE_CLIENT_MS }
     ),
 
   scoreStory: (roId: string, lineId: string, warrantyStory: string) =>
     apiFetch<{ quality: StoryQualityResult }>(
       `/api/repair-orders/${roId}/lines/${lineId}/score-story`,
-      { method: 'POST', body: JSON.stringify({ warrantyStory }), timeoutMs: 60_000 }
+      { method: 'POST', body: JSON.stringify({ warrantyStory }), timeoutMs: STORY_SCORE_CLIENT_MS }
     ),
 
   reviewStory: (roId: string, lineId: string, warrantyStory: string) =>

@@ -11,7 +11,6 @@ import {
   formatKnowledgeBaseForPrompt,
   GLOBAL_DEALERSHIP_ID,
   mapKnowledgeBase,
-  seedTemplateLibraryIfEmpty,
   selectRelevantKnowledgeEntries,
 } from '@/lib/templateLibrary';
 import { isCustomerPayRepairLine } from '@/lib/customerPayLine';
@@ -21,6 +20,10 @@ import { apiError, NOT_FOUND_ERROR } from '@/lib/errors';
 import { mapGrokRouteError } from '@/lib/grokErrors';
 import { getRequestIp, RATE_LIMITS } from '@/lib/rate-limit';
 import { sanitizeForCDKWithMeta } from '@/lib/sanitizeForCDK';
+import { STORY_GENERATE_ROUTE_MAX_DURATION_S } from '@/lib/timeouts';
+
+/** Keep in sync with STORY_GENERATE_ROUTE_MAX_DURATION_S in `@/lib/timeouts`. */
+export const maxDuration = STORY_GENERATE_ROUTE_MAX_DURATION_S;
 
 export async function POST(
   request: Request,
@@ -55,8 +58,7 @@ export async function POST(
         );
       }
 
-      const [, similar, advisorCtx] = await Promise.all([
-        seedTemplateLibraryIfEmpty(),
+      const [similar, advisorCtx] = await Promise.all([
         prisma.repairOrder.findMany({
           where: {
             dealershipId: session.dealershipId,
