@@ -19,6 +19,27 @@ describe('manual story audit workflow', () => {
     assert.match(workflow, /return \{[^}]*scoreStory/);
   });
 
+  test('scoreStory acquires in-flight lock before flushPendingSave', () => {
+    const workflow = readFileSync(join(process.cwd(), 'src/hooks/repairOrders/useROStoryWorkflow.ts'), 'utf8');
+    const scoreBlock = workflow.slice(workflow.indexOf('const scoreStory = useCallback'));
+    const tryIdx = scoreBlock.indexOf('try {');
+    const lockIdx = scoreBlock.indexOf('storyScoringInFlightRef.current = true');
+    const flushIdx = scoreBlock.indexOf('flushPendingSave({ maxWaitMs: 2_500 })');
+    assert.ok(lockIdx >= 0 && flushIdx >= 0 && tryIdx >= 0);
+    assert.ok(lockIdx < flushIdx, 'scoring lock must be set before awaiting save flush');
+    assert.match(scoreBlock, /Story audit already in progress/);
+  });
+
+  test('reviewStory acquires in-flight lock before flushPendingSave', () => {
+    const workflow = readFileSync(join(process.cwd(), 'src/hooks/repairOrders/useROStoryWorkflow.ts'), 'utf8');
+    const reviewBlock = workflow.slice(workflow.indexOf('const reviewStory = useCallback'));
+    const lockIdx = reviewBlock.indexOf('storyReviewInFlightRef.current = true');
+    const flushIdx = reviewBlock.indexOf('flushPendingSave({ maxWaitMs: 2_500 })');
+    assert.ok(lockIdx >= 0 && flushIdx >= 0);
+    assert.ok(lockIdx < flushIdx, 'review lock must be set before awaiting save flush');
+    assert.match(reviewBlock, /AI review already in progress/);
+  });
+
   test('quality loading panel separates generation from audit scoring', () => {
     const panel = readFileSync(join(process.cwd(), 'src/components/StoryQualityPanel.tsx'), 'utf8');
     assert.match(panel, /mode === 'scoring'/);

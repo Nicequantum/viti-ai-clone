@@ -41,6 +41,7 @@ export function useROStoryWorkflow(
     ) => RepairOrder | null;
     clearLineQualityState: (lineId: string) => void;
     invalidateReviewRequests: () => void;
+    invalidateScoreRequests: () => void;
   }
 ) {
   const applyCustomerPayTemplate = useCallback(
@@ -123,6 +124,7 @@ export function useROStoryWorkflow(
 
       try {
         if (refs.storyReviewInFlightRef.current) deps.invalidateReviewRequests();
+        if (refs.storyScoringInFlightRef.current) deps.invalidateScoreRequests();
         // Never block generation on a stuck save queue (was causing multi-minute waits).
         await deps.flushPendingSave({ maxWaitMs: 2_500 });
 
@@ -144,6 +146,7 @@ export function useROStoryWorkflow(
 
         deps.clearLineQualityState(lineId);
         deps.invalidateReviewRequests();
+        deps.invalidateScoreRequests();
         const { warrantyStory, cdkSanitized } = await api.generateStory(latestRO.id, lineId);
         if (seq !== refs.generateStorySeqRef.current) return;
 
@@ -187,33 +190,16 @@ export function useROStoryWorkflow(
   );
 
   const scoreStory = useCallback(
-    async (lineId: string) => {
-      if (refs.storyScoringInFlightRef.current) return;
+    async (lineId: string, storyTextOverride?: string) => {
+      if (refs.storyScoringInFlightRef.current) {
+        toast.message('Story audit already in progress…');
+        return;
+      }
       if (refs.storyGenerationInFlightRef.current) {
         toast.error('Wait for story generation to finish before auditing');
         return;
       }
-      await deps.flushPendingSave();
-      const latestRO = refs.roRef.current;
-      const targetLine = latestRO?.repairLines.find((l) => l.id === lineId);
-      if (isCustomerPayRepairLine(targetLine)) {
-        toast.message('Customer Pay stories skip AI audit — edit the text if needed.');
-        return;
-      }
-      if (!latestRO) return;
-      const roId = latestRO.id;
-      const storyText = targetLine?.warrantyStory?.trim();
-      if (!storyText) {
-        toast.error('Generate or write a warranty story before running the audit');
-        return;
-      }
 
-      setters.setStoryReviewByLine((prev) => {
-        if (!prev[lineId]) return prev;
-        const next = { ...prev };
-        delete next[lineId];
-        return next;
-      });
       const seq = ++refs.scoreStorySeqRef.current;
       refs.storyScoringInFlightRef.current = true;
       setters.setScoringLineId(lineId);
@@ -221,6 +207,33 @@ export function useROStoryWorkflow(
       toast.message('Running MI quality audit…');
 
       try {
+        // Lock + loading before flush so the first click always gets feedback (was multi-click bug).
+        await deps.flushPendingSave({ maxWaitMs: 2_500 });
+
+        const latestRO = refs.roRef.current;
+        const targetLine = latestRO?.repairLines.find((l) => l.id === lineId);
+        if (isCustomerPayRepairLine(targetLine)) {
+          toast.message('Customer Pay stories skip AI audit — edit the text if needed.');
+          return;
+        }
+        if (!latestRO) {
+          toast.error('Repair order not loaded — go back and reopen the line');
+          return;
+        }
+        const roId = latestRO.id;
+        const storyText = (storyTextOverride?.trim() || targetLine?.warrantyStory?.trim()) ?? '';
+        if (!storyText) {
+          toast.error('Generate or write a warranty story before running the audit');
+          return;
+        }
+
+        setters.setStoryReviewByLine((prev) => {
+          if (!prev[lineId]) return prev;
+          const next = { ...prev };
+          delete next[lineId];
+          return next;
+        });
+
         const { quality } = await api.scoreStory(roId, lineId, storyText);
         if (seq !== refs.scoreStorySeqRef.current) return;
 
@@ -256,8 +269,11 @@ export function useROStoryWorkflow(
   );
 
   const reviewStory = useCallback(
-    async (lineId: string) => {
-      if (refs.storyReviewInFlightRef.current) return;
+    async (lineId: string, storyTextOverride?: string) => {
+      if (refs.storyReviewInFlightRef.current) {
+        toast.message('AI review already in progress…');
+        return;
+      }
       if (refs.storyScoringInFlightRef.current) {
         toast.error('Wait for the audit to finish before running a full review');
         return;
@@ -266,27 +282,34 @@ export function useROStoryWorkflow(
         toast.error('Wait for story generation to finish before reviewing');
         return;
       }
-      await deps.flushPendingSave();
-      const latestRO = refs.roRef.current;
-      const targetLine = latestRO?.repairLines.find((l) => l.id === lineId);
-      if (isCustomerPayRepairLine(targetLine)) {
-        toast.message('Customer Pay stories skip AI review — edit the text if needed.');
-        return;
-      }
-      if (!latestRO) return;
-      const roId = latestRO.id;
-      const storyText = targetLine?.warrantyStory?.trim();
-      if (!storyText) {
-        toast.error('Write or generate a warranty story before reviewing');
-        return;
-      }
 
       deps.clearLineQualityState(lineId);
       const seq = ++refs.reviewStorySeqRef.current;
       refs.storyReviewInFlightRef.current = true;
       setters.setReviewingLineId(lineId);
       setters.setIsReviewing(true);
+      toast.message('Running full MI 4.3 review…');
+
       try {
+        await deps.flushPendingSave({ maxWaitMs: 2_500 });
+
+        const latestRO = refs.roRef.current;
+        const targetLine = latestRO?.repairLines.find((l) => l.id === lineId);
+        if (isCustomerPayRepairLine(targetLine)) {
+          toast.message('Customer Pay stories skip AI review — edit the text if needed.');
+          return;
+        }
+        if (!latestRO) {
+          toast.error('Repair order not loaded — go back and reopen the line');
+          return;
+        }
+        const roId = latestRO.id;
+        const storyText = (storyTextOverride?.trim() || targetLine?.warrantyStory?.trim()) ?? '';
+        if (!storyText) {
+          toast.error('Write or generate a warranty story before reviewing');
+          return;
+        }
+
         const { review } = await api.reviewStory(roId, lineId, storyText);
         if (seq !== refs.reviewStorySeqRef.current) return;
 

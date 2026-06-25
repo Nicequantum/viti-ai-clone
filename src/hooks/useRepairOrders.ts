@@ -1140,6 +1140,13 @@ export function useRepairOrders({
     setReviewingLineId(null);
   }, []);
 
+  const invalidateScoreRequests = useCallback(() => {
+    scoreStorySeqRef.current += 1;
+    storyScoringInFlightRef.current = false;
+    setIsScoring(false);
+    setScoringLineId(null);
+  }, []);
+
   const clearLineQualityState = useCallback((lineId: string) => {
     setStoryQualityByLine((prev) => {
       if (!prev[lineId]) return prev;
@@ -1178,7 +1185,7 @@ export function useRepairOrders({
         setStoryReviewByLine,
         setCdkSanitizedByLine,
       },
-      { flushPendingSave, applyROUpdate, clearLineQualityState, invalidateReviewRequests }
+      { flushPendingSave, applyROUpdate, clearLineQualityState, invalidateReviewRequests, invalidateScoreRequests }
     );
 
   const acknowledgeStoryBaseline = useCallback((lineId: string, text: string) => {

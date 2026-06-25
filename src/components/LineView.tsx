@@ -42,8 +42,8 @@ interface LineViewProps {
   onAddXentryPhotos: () => void;
   onDeleteXentryImage: (imageId: string) => void;
   onGenerateStory: () => void;
-  onScoreStory: () => void;
-  onReviewStory: () => void;
+  onScoreStory: (storyText?: string) => void | Promise<void>;
+  onReviewStory: (storyText?: string) => void | Promise<void>;
   onApplyCustomerPayTemplate: (templateId: string) => void | Promise<void>;
   onClearCustomerPayMode?: () => void | Promise<void>;
   onAcknowledgeStoryBaseline: (text: string) => void;
@@ -132,9 +132,22 @@ export function LineView({
     }
   };
 
+  const readStoryText = () => {
+    const storyEl = document.getElementById(`warranty-story-${line.id}`) as HTMLTextAreaElement | null;
+    return (storyEl?.value ?? line.warrantyStory ?? '').trim();
+  };
+
   const handleGenerateStory = () => {
     console.log('Generate Story clicked');
-    onGenerateStory();
+    void onGenerateStory();
+  };
+
+  const handleScoreStory = () => {
+    void onScoreStory(readStoryText());
+  };
+
+  const handleReviewStory = () => {
+    void onReviewStory(readStoryText());
   };
 
   const handlePdf = async () => {
@@ -437,7 +450,7 @@ export function LineView({
                   />
                 )}
                 {!isGenerating && !isScoring && !isReviewing && !storyQuality && storyQualityStale && (
-                  <StoryQualityStaleBanner onAudit={onScoreStory} />
+                  <StoryQualityStaleBanner onAudit={handleScoreStory} />
                 )}
               </div>
             )}
@@ -457,8 +470,8 @@ export function LineView({
                   <div className="grid grid-cols-2 gap-2.5">
                     <button
                       type="button"
-                      onClick={onScoreStory}
-                      disabled={isGenerating || isScoring || isReviewing || !line.warrantyStory?.trim()}
+                      onClick={handleScoreStory}
+                      disabled={isGenerating || isScoring || isReviewing || !(line.warrantyStory?.trim())}
                       className="secondary-btn benz-btn-accent-outline h-12 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
                     >
                       {isScoring ? (
@@ -483,8 +496,8 @@ export function LineView({
                   </div>
                   <button
                     type="button"
-                    onClick={onReviewStory}
-                    disabled={isGenerating || isScoring || isReviewing || !line.warrantyStory?.trim()}
+                    onClick={handleReviewStory}
+                    disabled={isGenerating || isScoring || isReviewing || !(line.warrantyStory?.trim())}
                     className="secondary-btn h-11 w-full flex items-center justify-center gap-2 text-sm disabled:opacity-50"
                   >
                     {isReviewing ? (

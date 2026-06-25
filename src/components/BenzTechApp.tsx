@@ -220,8 +220,8 @@ export function BenzTechApp() {
             }
             void ro.generateStory(lineId);
           }}
-          onScoreStory={() => ro.scoreStory(ro.currentLine!.id)}
-          onReviewStory={() => ro.reviewStory(ro.currentLine!.id)}
+          onScoreStory={(storyText) => void ro.scoreStory(ro.currentLine!.id, storyText)}
+          onReviewStory={(storyText) => void ro.reviewStory(ro.currentLine!.id, storyText)}
           onApplyCustomerPayTemplate={(templateId) =>
             ro.applyCustomerPayTemplate(ro.currentLine!.id, templateId)
           }
