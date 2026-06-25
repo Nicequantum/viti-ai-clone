@@ -5,6 +5,7 @@ import {
   SYSTEM_PROMPT,
   WARRANTY_STORY_MAX_TOKENS,
   WARRANTY_WORKFLOW_STEPS,
+  WARRANTY_WORKFLOW_SUMMARY,
   buildWarrantyStoryUserMessage,
 } from '../../src/prompts/warrantyStory';
 import type { RepairLine, RepairOrder } from '../../src/types';
@@ -43,22 +44,21 @@ const baseLine: RepairLine = {
 };
 
 describe('warranty story prompts', () => {
-  test('SYSTEM_PROMPT uses compact generation rules (style variation in user message)', () => {
+  test('SYSTEM_PROMPT is compact and covers workflow + audit safety', () => {
     assert.match(SYSTEM_PROMPT, /Merlin/i);
-    assert.match(SYSTEM_PROMPT, /MI 2\.0/i);
-    assert.match(SYSTEM_PROMPT, /flowing paragraphs|natural prose/i);
-    assert.match(SYSTEM_PROMPT, /no visible headings/i);
-    assert.match(SYSTEM_PROMPT, /Quick Test/i);
     assert.match(SYSTEM_PROMPT, /10 workflow steps/i);
+    assert.match(SYSTEM_PROMPT, /Quick Test/i);
     assert.match(SYSTEM_PROMPT, /\[NOT DOCUMENTED\]/);
-    assert.match(SYSTEM_PROMPT, /style variation arrives in the user message/i);
-    assert.doesNotMatch(SYSTEM_PROMPT, /NATURAL STYLE VARIATION \(CRITICAL/i);
+    assert.match(SYSTEM_PROMPT, /WARRANTY_WORKFLOW_SUMMARY|test drive/i);
+    assert.ok(SYSTEM_PROMPT.length < 600);
+    assert.doesNotMatch(SYSTEM_PROMPT, /NATURAL STYLE VARIATION/i);
   });
 
   test('WARRANTY_WORKFLOW_STEPS lists all 10 billing/audit steps in order', () => {
     assert.equal(WARRANTY_WORKFLOW_STEPS.length, 10);
     assert.match(WARRANTY_WORKFLOW_STEPS[0], /Initial test drive/i);
     assert.match(WARRANTY_WORKFLOW_STEPS[9], /Final verification test drive/i);
+    assert.match(WARRANTY_WORKFLOW_SUMMARY, /verification drive/i);
   });
 
   test('STORY_TEMPLATES reference diagnostic workflow elements', () => {
@@ -68,28 +68,18 @@ describe('warranty story prompts', () => {
     }
   });
 
-  test('buildWarrantyStoryUserMessage injects workflow checklist, natural format, and style variation', () => {
-    const message = buildWarrantyStoryUserMessage(baseRo, baseLine, '', 0);
-    assert.match(message, /Required workflow/i);
-    assert.match(message, /Initial test drive to confirm\/reproduce/i);
-    assert.match(message, /Disconnect battery charger and XENTRY/i);
-    assert.match(message, /natural paragraph form/i);
-    assert.match(message, /no visible headings/i);
-    assert.match(message, /28450 → 28458/);
+  test('buildWarrantyStoryUserMessage includes line data only', () => {
+    const message = buildWarrantyStoryUserMessage(baseRo, baseLine);
+    assert.match(message, /Line 1/i);
+    assert.match(message, /28450→28458/);
     assert.match(message, /P0300/);
-    assert.match(message, /Chronological narrative/);
-    assert.match(message, /Style variation for THIS story/i);
-    assert.match(message, /Sentence rhythm:/i);
-    assert.match(message, /Technical detail emphasis:/i);
-    assert.match(message, /Transitional phrasing:/i);
-  });
-
-  test('buildWarrantyStoryUserMessage selects template by index', () => {
-    const explicit = buildWarrantyStoryUserMessage(baseRo, baseLine, '', 2);
-    assert.match(explicit, /Concise audit record/);
+    assert.match(message, /10 workflow steps/i);
+    assert.ok(message.length < 1_200);
+    assert.doesNotMatch(message, /Style variation/i);
+    assert.doesNotMatch(message, /Advisor opening/i);
   });
 
   test('WARRANTY_STORY_MAX_TOKENS limits generation output', () => {
-    assert.equal(WARRANTY_STORY_MAX_TOKENS, 550);
+    assert.equal(WARRANTY_STORY_MAX_TOKENS, 400);
   });
 });

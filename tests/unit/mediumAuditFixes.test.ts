@@ -26,9 +26,13 @@ describe('Medium audit fixes (M1–M30)', () => {
     assert.ok(src.includes('isDuplicateTemplateApply'));
   });
 
-  it('M4/M5: warranty KB and similar RO filters', () => {
+  it('M4/M5: warranty KB filter and customer pay generation guard', () => {
     assert.ok(readSrc('src/lib/templateLibrary.ts').includes("entry.category !== 'customer'"));
-    assert.ok(readSrc('src/app/api/repair-orders/[id]/lines/[lineId]/generate-story/route.ts').includes('!l.isCustomerPay'));
+    assert.ok(
+      readSrc('src/app/api/repair-orders/[id]/lines/[lineId]/generate-story/route.ts').includes(
+        'isCustomerPayRepairLine'
+      )
+    );
   });
 
   it('M6: prompt fingerprint metadata', () => {

@@ -64,16 +64,9 @@ describe('advisor prompt context', () => {
     assert.match(formatted, /Never transplant example complaints/);
   });
 
-  test('injects advisor context into warranty story user message', () => {
-    const advisorContext = formatAdvisorContextForPrompt(sampleContext);
-    const message = buildWarrantyStoryUserMessage(baseRo, baseLine, '', undefined, advisorContext);
-    assert.match(message, /Advisor opening style only/i);
-    assert.match(message, /Maria Lopez/);
-    assert.match(message, /Advisor opening style only/i);
-  });
-
-  test('omits advisor section when no context is provided', () => {
+  test('fast story prompt omits advisor context for latency', () => {
     const message = buildWarrantyStoryUserMessage(baseRo, baseLine);
     assert.doesNotMatch(message, /Advisor opening style only/i);
+    assert.doesNotMatch(message, /Maria Lopez/);
   });
 });

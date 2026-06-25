@@ -36,9 +36,12 @@ import { parseStructuredROText } from '@/utils/roExtractor';
 const GROK_API_URL = 'https://api.x.ai/v1/chat/completions';
 
 /**
- * xAI chat model — `grok-4.3` per https://docs.x.ai/docs/models (console.x.ai alias).
- * Used for story generation, scoring, and vision extraction.
+ * Fast non-reasoning model for warranty story generate/score — pre-4.3 latency profile.
+ * grok-4.3 reasoning tokens caused multi-minute delays even with reasoning_effort: none.
  */
+export const GROK_STORY_MODEL = 'grok-3';
+
+/** Vision + extraction — grok-4.3 supports image input. */
 export const GROK_CHAT_MODEL = 'grok-4.3';
 
 /** JSON quality score responses rarely exceed ~500 tokens. */
@@ -65,7 +68,8 @@ async function grokChat(
     max_tokens: number;
     timeoutMs?: number;
     perfLabel?: string;
-    /** grok-4.3 defaults to low reasoning — disable for latency-sensitive paths. */
+    model?: string;
+    /** Only sent for grok-4.x models — grok-3 ignores reasoning. */
     reasoningEffort?: GrokReasoningEffort;
   }
 ): Promise<string> {
@@ -73,7 +77,18 @@ async function grokChat(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const startedAt = Date.now();
+  const model = options.model ?? GROK_CHAT_MODEL;
   const reasoningEffort = options.reasoningEffort ?? 'none';
+
+  const requestBody: Record<string, unknown> = {
+    model,
+    messages,
+    temperature: options.temperature,
+    max_tokens: options.max_tokens,
+  };
+  if (model.includes('grok-4')) {
+    requestBody.reasoning_effort = reasoningEffort;
+  }
 
   try {
     const response = await fetch(GROK_API_URL, {
@@ -82,13 +97,7 @@ async function grokChat(
         Authorization: `Bearer ${getGrokApiKey()}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: GROK_CHAT_MODEL,
-        messages,
-        temperature: options.temperature,
-        max_tokens: options.max_tokens,
-        reasoning_effort: reasoningEffort,
-      }),
+      body: JSON.stringify(requestBody),
       signal: controller.signal,
     });
 
@@ -100,15 +109,15 @@ async function grokChat(
     const apiResponse = await response.json();
     const content = apiResponse.choices?.[0]?.message?.content?.trim() || '';
     logPerformance(options.perfLabel || 'grok.chat', Date.now() - startedAt, {
-      model: GROK_CHAT_MODEL,
+      model,
       maxTokens: options.max_tokens,
-      reasoningEffort,
+      reasoningEffort: model.includes('grok-4') ? reasoningEffort : 'n/a',
       outcome: 'ok',
     });
     return content;
   } catch (error) {
     logPerformance(options.perfLabel || 'grok.chat', Date.now() - startedAt, {
-      model: GROK_CHAT_MODEL,
+      model,
       outcome: 'error',
       error: error instanceof Error ? error.message : 'unknown',
     });
@@ -121,29 +130,19 @@ async function grokChat(
   }
 }
 
-export async function generateWarrantyStory(
-  ro: RepairOrder,
-  line: RepairLine,
-  historyContext = '',
-  advisorContext = '',
-  knowledgeBaseContext = ''
-): Promise<string> {
-  // PROMPT_VERSION is stamped on story.generate audit entries for warranty compliance traceability.
-  const systemPrompt = knowledgeBaseContext
-    ? `${SYSTEM_PROMPT}\n\n${knowledgeBaseContext}`
-    : SYSTEM_PROMPT;
-  const userMessage = buildWarrantyStoryUserMessage(ro, line, historyContext, undefined, advisorContext);
+export async function generateWarrantyStory(ro: RepairOrder, line: RepairLine): Promise<string> {
+  const userMessage = buildWarrantyStoryUserMessage(ro, line);
   const story = await grokChat(
     [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userMessage },
     ],
     {
+      model: GROK_STORY_MODEL,
       temperature: WARRANTY_STORY_TEMPERATURE,
       max_tokens: WARRANTY_STORY_MAX_TOKENS,
       timeoutMs: STORY_GENERATE_GROK_MS,
       perfLabel: 'grok.story.generate',
-      reasoningEffort: 'none',
     }
   );
   return story || 'No story generated.';
@@ -160,11 +159,11 @@ export async function scoreWarrantyStory(
       { role: 'user', content: buildStoryScoreUserMessage(ro, line, warrantyStory) },
     ],
     {
+      model: GROK_STORY_MODEL,
       temperature: 0.1,
       max_tokens: WARRANTY_STORY_SCORE_MAX_TOKENS,
       timeoutMs: STORY_SCORE_GROK_MS,
       perfLabel: 'grok.story.score',
-      reasoningEffort: 'none',
     }
   );
   return parseStoryQualityResponse(raw);

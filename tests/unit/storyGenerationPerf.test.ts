@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, test } from 'node:test';
 import { STORY_GENERATION_PHASES } from '../../src/hooks/useStoryGenerationPhase';
 import {
+  SYSTEM_PROMPT,
   WARRANTY_STORY_MAX_TOKENS,
   WARRANTY_STORY_TEMPERATURE,
   buildWarrantyStoryUserMessage,
@@ -45,26 +46,25 @@ const baseLine: RepairLine = {
 };
 
 describe('story generation performance settings', () => {
-  test('uses grok-4.3 with reasoning disabled for latency', () => {
+  test('uses grok-3 for story generate/score and grok-4.3 for vision', () => {
     const grokSrc = readFileSync(join(process.cwd(), 'src/lib/grok.ts'), 'utf8');
+    assert.match(grokSrc, /GROK_STORY_MODEL = 'grok-3'/);
     assert.match(grokSrc, /GROK_CHAT_MODEL = 'grok-4\.3'/);
-    assert.match(grokSrc, /WARRANTY_STORY_SCORE_MAX_TOKENS = 650/);
-    assert.match(grokSrc, /reasoning_effort: reasoningEffort/);
-    assert.match(grokSrc, /reasoningEffort: 'none'/);
+    assert.match(grokSrc, /model: GROK_STORY_MODEL/);
+    assert.match(grokSrc, /model\.includes\('grok-4'\)/);
   });
 
-  test('caps generation and score output tokens', () => {
-    assert.equal(WARRANTY_STORY_MAX_TOKENS, 550);
+  test('caps generation output tokens for fast responses', () => {
+    assert.equal(WARRANTY_STORY_MAX_TOKENS, 400);
     assert.ok(WARRANTY_STORY_TEMPERATURE <= 0.25);
   });
 
-  test('user prompt truncates oversized history context', () => {
-    const compact = buildWarrantyStoryUserMessage(baseRo, baseLine, '', 0);
-    const withHistory = buildWarrantyStoryUserMessage(baseRo, baseLine, 'x'.repeat(4_000), 0);
-    assert.ok(compact.length < 2_800);
-    assert.match(withHistory, /Style reference/);
-    assert.match(withHistory, /truncated/);
-    assert.ok(!withHistory.includes('x'.repeat(1_000)));
+  test('prompts stay compact for sub-30s generation', () => {
+    const userMessage = buildWarrantyStoryUserMessage(baseRo, baseLine);
+    assert.ok(SYSTEM_PROMPT.length < 600);
+    assert.ok(userMessage.length < 1_200);
+    assert.match(userMessage, /P0300/);
+    assert.doesNotMatch(userMessage, /Style variation/i);
   });
 
   test('score system prompt uses compact MI criteria', () => {

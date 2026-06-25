@@ -1,18 +1,8 @@
 import { writeAuditLog } from '@/lib/audit';
 import { withAuth } from '@/lib/apiRoute';
-import {
-  formatAdvisorContextForPrompt,
-  loadAdvisorPromptContextForRepairOrder,
-} from '@/lib/advisorIntelligence';
 import { prisma } from '@/lib/db';
 import { generateWarrantyStory } from '@/lib/grok';
-import { hashPromptFragment, buildStoryGenerateAuditMetadata } from '@/lib/promptFingerprint';
-import {
-  formatKnowledgeBaseForPrompt,
-  GLOBAL_DEALERSHIP_ID,
-  mapKnowledgeBase,
-  selectRelevantKnowledgeEntries,
-} from '@/lib/templateLibrary';
+import { buildStoryGenerateAuditMetadata } from '@/lib/promptFingerprint';
 import { isCustomerPayRepairLine } from '@/lib/customerPayLine';
 import { encryptOptionalSensitiveText } from '@/lib/encryption';
 import { dbToRepairOrder } from '@/lib/roMapper';
@@ -57,59 +47,10 @@ export async function POST(
         );
       }
 
-      const [similar, advisorCtx] = await Promise.all([
-        prisma.repairOrder.findMany({
-          where: {
-            dealershipId: session.dealershipId,
-            id: { not: id },
-            model: ro.model ? { contains: ro.model.split(' ')[0] } : undefined,
-          },
-          include: { repairLines: true },
-          take: 1,
-        }),
-        loadAdvisorPromptContextForRepairOrder(id),
-      ]);
-
-      let historyContext = '';
-      if (similar.length > 0) {
-        historyContext =
-          similar
-            .map((r) => {
-              const m = dbToRepairOrder(r);
-              return m.repairLines
-                // M5: exclude Customer Pay stories from warranty style reference.
-                .filter((l) => l.warrantyStory && !l.isCustomerPay)
-                .map((l) => `${l.description}: ${l.warrantyStory!.substring(0, 160)}…`)
-                .join('\n');
-            })
-            .join('\n');
-      }
-
-      const advisorContext = advisorCtx ? formatAdvisorContextForPrompt(advisorCtx) : '';
-
-      const kbRows = await prisma.knowledgeBase.findMany({
-        where: {
-          // M4: Customer Pay templates must not pollute warranty AI knowledge base.
-          category: { not: 'customer' },
-          OR: [{ dealershipId: GLOBAL_DEALERSHIP_ID }, { dealershipId: session.dealershipId, source: 'user' }],
-        },
-        orderBy: [{ source: 'desc' }, { updatedAt: 'desc' }],
-        take: 40,
-      });
-      const kbEntries = kbRows.map(mapKnowledgeBase);
-      const relevantKb = selectRelevantKnowledgeEntries(mapped, line, kbEntries, session.dealershipId, 3);
-      const knowledgeBaseContext = formatKnowledgeBaseForPrompt(relevantKb, { maxEntryChars: 420 });
-
       let warrantyStory: string;
       let cdkSanitized = false;
       try {
-        const rawStory = await generateWarrantyStory(
-          mapped,
-          line,
-          historyContext,
-          advisorContext,
-          knowledgeBaseContext
-        );
+        const rawStory = await generateWarrantyStory(mapped, line);
         const cleaned = sanitizeForCDKWithMeta(rawStory);
         warrantyStory = cleaned.text;
         cdkSanitized = cleaned.wasModified;
@@ -119,10 +60,6 @@ export async function POST(
       }
 
       // C3: durable audit trail before persisting story — if audit fails, story is not saved.
-      const historyContextLineCount = historyContext
-        ? historyContext.split('\n').filter((row) => row.trim().length > 0).length
-        : 0;
-
       await writeAuditLog({
         action: 'story.generate',
         dealershipId: session.dealershipId,
@@ -132,13 +69,13 @@ export async function POST(
         metadata: buildStoryGenerateAuditMetadata({
           repairOrderId: id,
           lineNumber: line.lineNumber,
-          advisorIntelligenceUsed: Boolean(advisorCtx),
-          advisorContextHash: advisorContext ? hashPromptFragment(advisorContext) : null,
-          knowledgeBaseEntryIds: relevantKb.map((entry) => entry.id),
-          historyContextLineCount,
+          advisorIntelligenceUsed: false,
+          advisorContextHash: null,
+          knowledgeBaseEntryIds: [],
+          historyContextLineCount: 0,
           qualityScore: null,
           qualityGrade: null,
-          serviceAdvisorId: advisorCtx?.serviceAdvisorId ?? null,
+          serviceAdvisorId: null,
         }),
         ipAddress: getRequestIp(request),
       });

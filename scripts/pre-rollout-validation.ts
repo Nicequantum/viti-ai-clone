@@ -731,8 +731,8 @@ function checkMediumAuditFixes(): void {
     resolve(process.cwd(), 'src/app/api/repair-orders/[id]/lines/[lineId]/generate-story/route.ts'),
     'utf8'
   );
-  if (genSrc.includes('buildStoryGenerateAuditMetadata') && genSrc.includes('!l.isCustomerPay')) {
-    record('Medium', 'M4–M6 warranty AI audit', 'pass', 'KB filter, similar-RO filter, prompt fingerprint');
+  if (genSrc.includes('buildStoryGenerateAuditMetadata') && genSrc.includes('isCustomerPayRepairLine')) {
+    record('Medium', 'M4–M6 warranty AI audit', 'pass', 'Customer pay guard + prompt fingerprint');
   } else {
     record('Medium', 'M4–M6 warranty AI audit', 'fail', 'Warranty AI medium fixes incomplete');
   }
