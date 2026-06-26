@@ -100,12 +100,17 @@ export function useRepairOrders({
     todayROs,
   } = useROList(session);
 
-  const { flushPendingSave, applyROUpdate, saveROImmediate, persistRO } = useROPersistence(
-    allROs,
-    setAllROs,
-    roRef,
-    setCurrentRO
-  );
+  const { flushPendingSave, cancelPendingSave, applyROUpdate, saveROImmediate, persistRO } =
+    useROPersistence(allROs, setAllROs, roRef, setCurrentRO);
+
+  const prepareForScan = useCallback(async () => {
+    await flushPendingSave();
+    cancelPendingSave();
+  }, [cancelPendingSave, flushPendingSave]);
+
+  const openScanResultView = useCallback(() => {
+    setView('ro');
+  }, []);
 
   const navigateView = useCallback(
     (next: AppView) => {
@@ -134,7 +139,8 @@ export function useRepairOrders({
     roRef,
     setAllROs,
     setCurrentRO,
-    navigateView,
+    prepareForScan,
+    openScanResultView,
     onOcrStart,
     onOcrFinish,
     setOcrProgress,

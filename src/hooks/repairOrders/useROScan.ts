@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { clientLog } from '@/lib/clientLog';
 import { runMultiPassOCR } from '@/services/ocr';
-import type { AppView, PendingImage, RepairOrder } from '@/types';
+import type { PendingImage, RepairOrder } from '@/types';
 import {
   extractCustomerName,
   extractRoNumberFromText,
@@ -36,7 +36,10 @@ interface UseROScanOptions {
   roRef: MutableRefObject<RepairOrder | null>;
   setAllROs: Dispatch<SetStateAction<RepairOrder[]>>;
   setCurrentRO: Dispatch<SetStateAction<RepairOrder | null>>;
-  navigateView: (next: AppView) => void;
+  /** Flush + cancel stale debounced saves before scan (prevents post-scan overwrite). */
+  prepareForScan: () => Promise<void>;
+  /** Open scanned RO without flushPendingSave — navigateView races with new RO state. */
+  openScanResultView: () => void;
   onOcrStart: (message?: string) => void;
   onOcrFinish: () => void;
   setOcrProgress: (p: number) => void;
@@ -48,7 +51,8 @@ export function useROScan({
   roRef,
   setAllROs,
   setCurrentRO,
-  navigateView,
+  prepareForScan,
+  openScanResultView,
   onOcrStart,
   onOcrFinish,
   setOcrProgress,
@@ -92,7 +96,7 @@ export function useROScan({
         roRef.current = ensureComplaintIds(repairOrder);
         setAllROs((prev) => [repairOrder, ...prev]);
         setCurrentRO(repairOrder);
-        navigateView('ro');
+        openScanResultView();
         toast.success('Repair order created from scan');
         return true;
       } catch (e) {
@@ -100,7 +104,7 @@ export function useROScan({
         return false;
       }
     },
-    [navigateView, roRef, setAllROs, setCurrentRO]
+    [openScanResultView, roRef, setAllROs, setCurrentRO]
   );
 
   const createROFromText = useCallback(
@@ -124,13 +128,13 @@ export function useROScan({
         roRef.current = ensureComplaintIds(repairOrder);
         setAllROs((prev) => [repairOrder, ...prev]);
         setCurrentRO(repairOrder);
-        navigateView('ro');
+        openScanResultView();
         toast.success('Repair order created from scan');
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Failed to create repair order');
       }
     },
-    [navigateView, roRef, setAllROs, setCurrentRO]
+    [openScanResultView, roRef, setAllROs, setCurrentRO]
   );
 
   const processScanImages = useCallback(
@@ -147,6 +151,9 @@ export function useROScan({
 
       scanCancelledRef.current = false;
       scanInFlightRef.current = true;
+      await prepareForScan();
+      if (!isActiveSession()) return;
+
       onOcrStart('Uploading documents…');
       setPendingROImages(images);
 
@@ -230,7 +237,6 @@ export function useROScan({
           throw new Error('Failed to create repair order from scan.');
         }
 
-        if (!isActiveSession()) return;
         setOcrProgress(100);
         setScanStatusMessage('Scan complete');
         clearPendingPreviews(images);
@@ -257,6 +263,7 @@ export function useROScan({
       createROFromExtracted,
       onOcrFinish,
       onOcrStart,
+      prepareForScan,
       setOcrProgress,
       setScanStatusMessage,
     ]

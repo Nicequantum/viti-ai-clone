@@ -5,11 +5,9 @@ import {
   ArrowLeft,
   BarChart3,
   Building2,
-  Check,
   KeyRound,
   LogOut,
   ScrollText,
-  Shield,
   User,
   UserPlus,
   UserRound,
@@ -21,7 +19,7 @@ import { toast } from 'sonner';
 import { api, type TechnicianUser } from '@/lib/api';
 import type { TechnicianSession } from '@/types';
 import { DealershipBranding } from '@/components/DealershipBranding';
-import { CONSENT_VERSION } from '@/types';
+import { SecurityComplianceSection } from '@/components/SecurityComplianceSection';
 
 interface SettingsViewProps {
   session: TechnicianSession;
@@ -211,38 +209,7 @@ export function SettingsView({ session, onBack, onLogout, onOpenAuditLogs, onOpe
         </form>
       </div>
 
-      <div className="benz-card p-5 mb-5">
-        <div className="flex items-center gap-2.5 mb-3">
-          <Shield size={18} className="text-benz-green" />
-          <div className="font-semibold text-sm tracking-tight">Security & Compliance</div>
-        </div>
-        <ul className="text-xs text-benz-secondary space-y-2.5 leading-relaxed">
-          <li className="flex items-start gap-2">
-            <Check size={14} className="text-benz-green shrink-0 mt-0.5" />
-            Grok API key secured server-side — never in browser
-          </li>
-          <li className="flex items-start gap-2">
-            <Check size={14} className="text-benz-green shrink-0 mt-0.5" />
-            Customer PII and repair content encrypted at rest (AES-256-GCM)
-          </li>
-          <li className="flex items-start gap-2">
-            <Check size={14} className="text-benz-green shrink-0 mt-0.5" />
-            Diagnostic images stored privately in Vercel Blob (session-gated access)
-          </li>
-          <li className="flex items-start gap-2">
-            <Check size={14} className="text-benz-green shrink-0 mt-0.5" />
-            Session-based technician authentication (12h)
-          </li>
-          <li className="flex items-start gap-2">
-            <Check size={14} className="text-benz-green shrink-0 mt-0.5" />
-            Audit-safe warranty prompt — no fabricated data
-          </li>
-          <li className="pt-1 text-benz-muted">
-            Consent accepted:{' '}
-            {session.consentAt ? new Date(session.consentAt).toLocaleDateString() : 'Pending'} (v{CONSENT_VERSION})
-          </li>
-        </ul>
-      </div>
+      <SecurityComplianceSection consentAt={session.consentAt} />
 
       {isAdmin && (
         <Link href="/admin/usage" className="benz-settings-nav mb-4 block no-underline text-inherit">

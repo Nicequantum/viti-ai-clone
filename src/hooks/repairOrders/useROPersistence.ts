@@ -138,10 +138,15 @@ export function useROPersistence(
     [roRef, saveROImmediate, scheduleSaveRO, setAllROs, setCurrentRO]
   );
 
+  const cancelPendingSave = useCallback(() => {
+    debouncedPersistRef.current.cancel();
+  }, []);
+
   return {
     persistRO,
     saveROImmediate,
     flushPendingSave,
+    cancelPendingSave,
     scheduleSaveRO,
     applyROUpdate,
     debouncedPersistRef,

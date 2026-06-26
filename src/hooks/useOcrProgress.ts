@@ -1,21 +1,21 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 export function useOcrProgress() {
   const [isProcessingOCR, setIsProcessingOCR] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [scanStatusMessage, setScanStatusMessage] = useState('');
 
-  const startOcr = (message = 'Preparing scan…') => {
+  const startOcr = useCallback((message = 'Preparing scan…') => {
     setIsProcessingOCR(true);
     setOcrProgress(0);
     setScanStatusMessage(message);
-  };
+  }, []);
 
-  const finishOcr = () => {
+  const finishOcr = useCallback(() => {
     setIsProcessingOCR(false);
     setOcrProgress(0);
     setScanStatusMessage('');
-  };
+  }, []);
 
   return {
     isProcessingOCR,
