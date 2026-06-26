@@ -1,5 +1,6 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { withSentryConfig } from '@sentry/nextjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -18,7 +19,6 @@ const nextConfig = {
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      // pdfjs-dist warns in Node unless the legacy build is used (Vercel build logs).
       'pdfjs-dist': path.resolve(__dirname, 'node_modules/pdfjs-dist/legacy/build/pdf.mjs'),
     };
     return config;
@@ -30,7 +30,6 @@ const nextConfig = {
     },
   },
   async headers() {
-    // M12: CSP is applied in src/middleware.ts (unsafe-inline scripts for internal dealership use).
     return [
       {
         source: '/(.*)',
@@ -47,4 +46,4 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig);
