@@ -50,5 +50,4 @@ export default withSentryConfig(nextConfig, {
   org: 'clarityauto',
   project: 'clarity-auto',
   silent: true,
-  hideSourceMaps: true,
 });
